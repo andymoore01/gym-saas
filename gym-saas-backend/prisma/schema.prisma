@@ -109,21 +109,22 @@ enum EstadoSocio {
   BAJA
 }
 
-model Pago {
-  id         String   @id @default(uuid())
-  monto      Float
-  fechaPago  DateTime @default(now())
-  metodoPago String   @default("EFECTIVO") // EFECTIVO, TRANSFERENCIA, TARJETA, MERCADOPAGO
-
-  socioId    String
-  socio      Socio    @relation(fields: [socioId], references: [id], onDelete: Cascade)
-
-  gimnasio   Gimnasio @relation(fields: [gimnasioId], references: [id])
-  gimnasioId String
-}
-
 enum MetodoPago {
   EFECTIVO
   TRANSFERENCIA
   TARJETA
 }
+
+model Pago {
+  id          String     @id @default(uuid())
+  socioId     String
+  gimnasioId  String
+  monto       Float
+  metodoPago  MetodoPago @default(EFECTIVO)
+  fechaPago   DateTime   @default(now())
+
+  socio       Socio      @relation(fields: [socioId], references: [id], onDelete: Cascade)
+  gimnasio    Gimnasio   @relation(fields: [gimnasioId], references: [id], onDelete: Cascade)
+}
+
+
