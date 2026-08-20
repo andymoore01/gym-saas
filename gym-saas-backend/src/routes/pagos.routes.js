@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import prisma from '../lib/prisma.js';
+
 const router = express.Router();
-const prisma = require('../lib/prisma');
 
 router.post('/', async (req, res) => {
   try {
@@ -69,4 +70,4 @@ router.post('/', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
