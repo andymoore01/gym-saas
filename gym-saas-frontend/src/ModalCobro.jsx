@@ -23,18 +23,20 @@ export function ModalCobro({ socio, onClose, onSuccess }) {
         body: JSON.stringify({
           socioId: socio.id,
           monto: Number(monto),
-          metodoPago: metodoPago.toUpperCase(),
+          metodoPago: metodoPago.toUpperCase().trim(), // Normalizamos a mayúsculas
           meses: 1
         }),
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
-        alert('¡Pago registrado con éxito!');
+        alert('¡Pago registrado y cuota renovada con éxito!');
         onSuccess();
         onClose();
       } else {
-        const err = await res.json().catch(() => ({}));
-        alert(`Error al registrar el pago: ${err.error || 'Intente nuevamente'}`);
+        console.error("Error del backend:", data);
+        alert(`Error al registrar el pago: ${data.error || 'Error al procesar el pago'}`);
       }
     } catch (err) {
       console.error(err);
