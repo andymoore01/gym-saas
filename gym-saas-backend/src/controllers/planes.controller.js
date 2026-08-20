@@ -3,7 +3,7 @@ const prisma = new PrismaClient();
 
 export const getPlanes = async (req, res) => {
   try {
-    const gimnasioId = req.usuario?.gimnasioId;
+    const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
 
     const planes = await prisma.plan.findMany({
       where: gimnasioId ? { gimnasioId } : {}

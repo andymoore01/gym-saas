@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.routes.js';
 import pagosRoutes from './routes/pagos.routes.js';
 import suscripcionRoutes from './routes/suscripcion.routes.js';
 import planesRoutes from './routes/planes.routes.js';
+
 const app = express();
 
 // Configuración de CORS limpia y permisiva para producción
