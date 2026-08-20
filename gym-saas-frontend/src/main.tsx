@@ -27,7 +27,6 @@ function parseJwt(token: string) {
 function App() {
   const [token, setToken] = useState<string | null>(null);
   const [rolUsuario, setRolUsuario] = useState<string | null>(null);
-  const [modoAdmin, setModoAdmin] = useState<boolean>(false);
   const [vistaLogin, setVistaLogin] = useState<boolean>(false);
 
   useEffect(() => {
@@ -40,7 +39,7 @@ function App() {
       }
     }
 
-    // Detectar si la URL pide el Login (?login=true o #login)
+    // Detectar si la URL pide el Login (?login=true o #login o /login)
     const url = window.location.href.toLowerCase();
     if (url.includes('login')) {
       setVistaLogin(true);
@@ -49,32 +48,21 @@ function App() {
 
   const esSuperAdmin = rolUsuario === 'SUPERADMIN';
 
-  // 1. PÁGINA SUPERADMIN
-  if (modoAdmin && esSuperAdmin) {
-    return <SuperAdmin onVolver={() => setModoAdmin(false)} />;
+  // 1. SI ES SUPERADMIN: SE LE MUESTRA EXCLUSIVAMENTE SU PANEL APARTE Y NADA MÁS
+  if (token && esSuperAdmin) {
+    return (
+      <SuperAdmin 
+        onVolver={() => {
+          localStorage.clear();
+          window.location.href = '/';
+        }} 
+      />
+    );
   }
 
-  // 2. SISTEMA RECEPCIÓN (GIMNASIO)
-  if (token) {
-    return (
-      <div>
-        {esSuperAdmin && (
-          <div className="bg-[#090A0C] border-b border-zinc-800 px-4 py-1.5 flex justify-between items-center text-xs">
-            <span className="text-purple-400 font-mono text-[11px] font-bold">
-              👑 Modo SuperAdmin Detectado
-            </span>
-            <button
-              onClick={() => setModoAdmin(true)}
-              className="bg-purple-900/80 hover:bg-purple-800 text-purple-200 border border-purple-500/40 px-3 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer"
-            >
-              Abrir Panel SuperAdmin
-            </button>
-          </div>
-        )}
-
-        <PantallaRecepcion />
-      </div>
-    );
+  // 2. SI ES UN GIMNASIO COMÚN (ADMIN): ENTRA DIRECTO A SU PANEL DE SOCIOS
+  if (token && !esSuperAdmin) {
+    return <PantallaRecepcion />;
   }
 
   // 3. PÁGINA DE LOGIN
@@ -84,7 +72,14 @@ function App() {
         onLoginSuccess={(newToken) => {
           setToken(newToken);
           setVistaLogin(false);
-          window.location.href = '/';
+          const decoded = parseJwt(newToken);
+          
+          // Redirección inmediata según el rol al loguearse con éxito
+          if (decoded && decoded.rol === 'SUPERADMIN') {
+            window.location.href = '/'; // Al recargar, caerá directo en el SuperAdmin
+          } else {
+            window.location.href = '/'; // Al recargar, caerá directo en PantallaRecepcion
+          }
         }}
       />
     );

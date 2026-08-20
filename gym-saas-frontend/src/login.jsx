@@ -23,7 +23,7 @@ export default function Login({ onLoginSuccess }) {
         localStorage.setItem('token', data.token);
         if (data.usuario) {
           localStorage.setItem('usuario', JSON.stringify(data.usuario));
-          localStorage.setItem('gimnasioId', data.usuario.gimnasioId);
+          localStorage.setItem('gimnasioId', data.usuario.gimnasioId || '');
         }
 
         if (onLoginSuccess) {
@@ -32,11 +32,10 @@ export default function Login({ onLoginSuccess }) {
         
         // REDIRECCIÓN INTELIGENTE SEGÚN EL ROL
         if (data.usuario && data.usuario.rol === 'SUPERADMIN') {
-          // Si es superadmin, lo mandamos directo al panel global (3era imagen)
-          // Ajusta esta ruta según cómo renderices el panel superadmin en tu app
+          // Si es superadmin, lo mandamos directo al panel global
           window.location.href = '/superadmin'; 
         } else {
-          // Si es un gimnasio común, va al panel de socios (2da imagen)
+          // Si es un gimnasio común, va al panel de socios
           window.location.href = '/dashboard';
         }
       } else {
@@ -82,7 +81,7 @@ export default function Login({ onLoginSuccess }) {
           disabled={loading}
           className="w-full bg-[#C6FF3D] text-black font-bold py-2.5 rounded-xl hover:bg-[#b0f024] transition-all text-sm mt-2"
         >
-          {loading ? 'Ingresando...' : 'Ingresar al Gimnasio'}
+          {loading ? 'Ingresando...' : 'Iniciar Sesión'}
         </button>
       </form>
     </div>
