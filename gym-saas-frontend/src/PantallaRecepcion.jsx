@@ -8,7 +8,7 @@ export default function PantallaRecepcion() {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('Todos');
   const [cargando, setCargando] = useState(true);
-  const [errorApi, setErrorApi] = useState(false);
+  const [mensajeError, setMensajeError] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
 
   const [nuevoSocio, setNuevoSocio] = useState({
@@ -20,8 +20,14 @@ export default function PantallaRecepcion() {
 
   const cargarDatos = async () => {
     setCargando(true);
-    setErrorApi(false);
+    setMensajeError('');
     const token = localStorage.getItem('token');
+
+    if (!token) {
+      setMensajeError('No se encontró un token de sesión. Por favor, reingresá.');
+      setCargando(false);
+      return;
+    }
 
     const headers = {
       'Content-Type': 'application/json',
@@ -29,17 +35,17 @@ export default function PantallaRecepcion() {
     };
 
     try {
-      // Intentar cargar socios
       const resSocios = await fetch(`${API_URL}/socios`, { headers });
+      
       if (resSocios.ok) {
         const dataSocios = await resSocios.json();
         setSocios(Array.isArray(dataSocios) ? dataSocios : []);
       } else {
-        // Solo si la API responde con un status de error real (ej. 500 o 401)
-        setErrorApi(true);
+        const errJson = await resSocios.json().catch(() => ({}));
+        setMensajeError(`Error ${resSocios.status}: ${errJson.error || errJson.message || 'Respuesta no válida de la API'}`);
       }
 
-      // Intentar cargar planes en silencio sin bloquear si no existen
+      // Carga opcional de planes
       try {
         const resPlanes = await fetch(`${API_URL}/planes`, { headers });
         if (resPlanes.ok) {
@@ -47,12 +53,12 @@ export default function PantallaRecepcion() {
           setPlanes(Array.isArray(dataPlanes) ? dataPlanes : []);
         }
       } catch (e) {
-        console.warn('Ruta de planes no disponible aún');
+        console.warn('Omitiendo planes:', e);
       }
 
     } catch (error) {
-      console.error('Error de red al conectar con el servidor:', error);
-      setErrorApi(true);
+      console.error('Error de red:', error);
+      setMensajeError(`Error de red o CORS al conectar con Render: ${error.message}`);
     } finally {
       setCargando(false);
     }
@@ -91,9 +97,7 @@ export default function PantallaRecepcion() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('usuario');
-    localStorage.removeItem('gimnasioId');
+    localStorage.clear();
     window.location.reload();
   };
 
@@ -136,18 +140,18 @@ export default function PantallaRecepcion() {
             onClick={handleLogout}
             className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium px-4 py-2.5 rounded-xl transition-all text-sm"
           >
-            Salir
+            Cerrar Sesión
           </button>
         </div>
       </div>
 
-      {/* ALERTA DE ERROR */}
-      {errorApi && (
-        <div className="max-w-7xl mx-auto mb-6 bg-red-950/40 border border-red-800 text-red-300 text-xs p-3.5 rounded-xl flex items-center justify-between">
-          <span>⚠️ Servidor desconectado o error en la API. Los cambios no se guardarán permanentemente.</span>
+      {/* ALERTA CON DETALLE DE ERROR */}
+      {mensajeError && (
+        <div className="max-w-7xl mx-auto mb-6 bg-red-950/40 border border-red-800 text-red-300 text-xs p-3.5 rounded-xl flex items-center justify-between gap-4">
+          <span>⚠️ <strong>Detalle del error:</strong> {mensajeError}</span>
           <button 
             onClick={cargarDatos}
-            className="underline font-bold hover:text-white"
+            className="underline font-bold hover:text-white shrink-0"
           >
             Reintentar
           </button>
