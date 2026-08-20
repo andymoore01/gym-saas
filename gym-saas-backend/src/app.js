@@ -9,9 +9,6 @@ import suscripcionRoutes from './routes/suscripcion.routes.js';
 import planesRoutes from './routes/planes.routes.js';
 import reportesRoutes from './routes/reportes.routes.js';
 import superadminRoutes from './routes/superadmin.routes.js';
-import authRoutes from './routes/auth.routes.js';
-import superadminRoutes from './routes/superadmin.routes.js';
-
 
 const app = express();
 
@@ -24,7 +21,7 @@ app.use(cors({
 
 app.use(express.json());
 
-// Montar rutas de la API
+// Montar rutas de la API (sin duplicados)
 app.use('/api/socios', sociosRoutes);
 app.use('/api/planes', planesRoutes); 
 app.use('/api/asistencias', asistenciasRoutes);
@@ -33,6 +30,10 @@ app.use('/api/pagos', pagosRoutes);
 app.use('/api/suscripcion', suscripcionRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/superadmin', superadminRoutes);
-app.use('/api/auth', authRoutes);
+
+// Ruta de prueba general por si se entra por GET
+app.get('/', (req, res) => {
+  res.send('API Backend Gym SaaS funcionando OK');
+});
 
 export default app;
