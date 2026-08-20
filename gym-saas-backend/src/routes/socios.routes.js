@@ -1,7 +1,7 @@
 
 import { Router } from 'express';
 import { getSocios, createSocio } from '../controllers/socios.controller.js';
-import { verifyToken } from '../middlewares/auth.middleware.js';
+import { verifyToken } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
