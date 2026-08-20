@@ -67,7 +67,8 @@ export const getSocioById = async (req, res) => {
 export const crearSocio = async (req, res) => {
   try {
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
-    const { nombre, apellido, telefono, notas, planId } = req.body;
+    // 1. Extraemos 'dni' del req.body
+    const { nombre, apellido, dni, telefono, notas, planId } = req.body;
 
     if (!gimnasioId) {
       return res.status(400).json({ error: 'El gimnasioId es requerido' });
@@ -99,10 +100,11 @@ export const crearSocio = async (req, res) => {
       targetPlanId = primerPlan.id;
     }
 
-    // Insertar ajustado 1:1 a schema.prisma
+    // 2. Pasamos el dni a Prisma
     const nuevoSocio = await prisma.socio.create({
       data: {
         nombre: nombreCompleto,
+        dni: dni ? String(dni).trim() : null, // Guarda el DNI si viene en la petición
         telefono: telefono ? String(telefono).trim() : null,
         notas: notas || null,
         gimnasioId: gimnasioId,

@@ -88,7 +88,7 @@ model Socio {
   id          String   @id @default(cuid())
   gimnasio    Gimnasio @relation(fields: [gimnasioId], references: [id])
   gimnasioId  String
-
+  dni       String?  // <-- Agregá esta línea (el ? significa opcional)
   nombre      String
   telefono    String?
   notas       String?
