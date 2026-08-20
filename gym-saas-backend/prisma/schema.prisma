@@ -1,0 +1,132 @@
+// Esquema multi-tenant: todo cuelga de un Gimnasio (tenant).
+// Cada consulta a socios/pagos/planes SIEMPRE se filtra por gimnasioId
+// para que un gimnasio jamás pueda ver datos de otro.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// --- TENANT ---------------------------------------------------
+
+model Gimnasio {
+  id            String    @id @default(cuid())
+  nombre        String
+  slug          String    @unique // ej: "gym-central" -> usado en subdominio o URL
+  email         String    @unique
+  createdAt     DateTime  @default(now())
+
+  // Estado de la suscripción QUE EL GIMNASIO TE PAGA A VOS (el SaaS)
+  suscripcion   Suscripcion?
+
+  usuarios      Usuario[]
+  socios        Socio[]
+  planes        Plan[]
+}
+
+// Suscripción del gimnasio a TU producto (lo que le cobrás vos, dueño del SaaS)
+model Suscripcion {
+  id                  String   @id @default(cuid())
+  gimnasio            Gimnasio @relation(fields: [gimnasioId], references: [id])
+  gimnasioId          String   @unique
+
+  estado              EstadoSuscripcion @default(EN_PRUEBA)
+  mercadopagoPreapprovalId String? // id de la suscripción recurrente en Mercado Pago
+  fechaInicio         DateTime @default(now())
+  fechaProximoCobro   DateTime?
+  planSaas            String   @default("basico") // básico / pro / etc. (tus propios planes de venta)
+}
+
+enum EstadoSuscripcion {
+  EN_PRUEBA
+  ACTIVA
+  VENCIDA
+  CANCELADA
+}
+
+// --- USUARIOS DEL GIMNASIO (staff que usa el sistema) ----------
+
+model Usuario {
+  id          String   @id @default(cuid())
+  gimnasio    Gimnasio @relation(fields: [gimnasioId], references: [id])
+  gimnasioId  String
+
+  nombre      String
+  email       String
+  passwordHash String
+  rol         RolUsuario @default(STAFF)
+  createdAt   DateTime @default(now())
+
+  @@unique([gimnasioId, email]) // el mismo email puede existir en 2 gimnasios distintos
+}
+
+enum RolUsuario {
+  ADMIN
+  STAFF
+}
+
+// --- PLANES DE CUOTA DEL GIMNASIO (3 días / libre / etc.) ------
+
+model Plan {
+  id          String   @id @default(cuid())
+  gimnasio    Gimnasio @relation(fields: [gimnasioId], references: [id])
+  gimnasioId  String
+
+  nombre      String  // "3 días", "Libre", "Libre + clases", etc. (configurable por gimnasio)
+  precio      Int     // en centavos o unidad mínima de moneda, para evitar floats
+  socios      Socio[]
+}
+
+// --- SOCIOS ------------------------------------------------------
+
+model Socio {
+  id          String   @id @default(cuid())
+  gimnasio    Gimnasio @relation(fields: [gimnasioId], references: [id])
+  gimnasioId  String
+
+  nombre      String
+  telefono    String?
+  notas       String?
+  estado      EstadoSocio @default(ACTIVO)
+  joinedDate  DateTime @default(now())
+  bajaDate    DateTime?
+
+  plan        Plan     @relation(fields: [planId], references: [id])
+  planId      String
+
+  pagos       Pago[]
+
+  @@index([gimnasioId])
+}
+
+enum EstadoSocio {
+  ACTIVO
+  BAJA
+}
+
+model Pago {
+  id          String   @id @default(cuid())
+  socio       Socio    @relation(fields: [socioId], references: [id])
+  socioId     String
+
+  // Se repite gimnasioId acá (denormalizado a propósito) para poder
+  // filtrar/reportar pagos por tenant sin tener que hacer join con Socio.
+  gimnasioId  String
+
+  fecha       DateTime @default(now())
+  monto       Int
+  metodo      MetodoPago @default(EFECTIVO)
+
+  @@index([gimnasioId, fecha])
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TRANSFERENCIA
+  TARJETA
+}
