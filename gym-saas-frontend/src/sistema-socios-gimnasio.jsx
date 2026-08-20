@@ -10,21 +10,22 @@ export default function PantallaRecepcion() {
   const [filtroEstado, setFiltroEstado] = useState('Todos');
   const [cargando, setCargando] = useState(true);
   const [mensajeError, setMensajeError] = useState('');
-  
+
   // Modales
   const [modalAbierto, setModalAbierto] = useState(false);
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
-  const [socioCobrar, setSocioCobrar] = useState(null); // 👈 Nuevo para cobrar
+  const [modalPlanesAbierto, setModalPlanesAbierto] = useState(false);
+  const [modalReportesAbierto, setModalReportesAbierto] = useState(false);
+  const [socioCobrar, setSocioCobrar] = useState(null);
 
-  // Estados de formularios
-  const [nuevoSocio, setNuevoSocio] = useState({
-    nombre: '',
-    dni: '',
-    telefono: '',
-    planId: ''
-  });
-
+  // Formularios
+  const [nuevoSocio, setNuevoSocio] = useState({ nombre: '', dni: '', telefono: '', planId: '' });
   const [socioEditar, setSocioEditar] = useState(null);
+  const [nuevoPlan, setNuevoPlan] = useState({ nombre: '', precio: '' });
+
+  // Reportes
+  const [datosReporte, setDatosReporte] = useState(null);
+  const [cargandoReporte, setCargandoReporte] = useState(false);
 
   // Cargar lista de socios y planes desde el backend
   const cargarDatos = async () => {
@@ -84,6 +85,87 @@ export default function PantallaRecepcion() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.location.reload();
+  };
+
+  // Función para cargar métricas de caja
+  const cargarReporteIngresos = async () => {
+    setCargandoReporte(true);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/reportes/ingresos`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDatosReporte(data);
+      }
+    } catch (err) {
+      console.error("Error al obtener reportes:", err);
+    } finally {
+      setCargandoReporte(false);
+    }
+  };
+
+  const abrirReportes = () => {
+    setModalReportesAbierto(true);
+    cargarReporteIngresos();
+  };
+
+  // Crear plan
+  const handleCrearPlan = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+
+    if (!nuevoPlan.nombre.trim() || !nuevoPlan.precio) {
+      alert('Completá el nombre y el precio del plan');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/planes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          nombre: nuevoPlan.nombre.trim(),
+          precio: Number(nuevoPlan.precio)
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok) {
+        setNuevoPlan({ nombre: '', precio: '' });
+        await cargarDatos();
+      } else {
+        alert(`Error al crear plan (${response.status}): ${data.error || data.detalle || 'Error en el servidor'}`);
+      }
+    } catch (error) {
+      alert(`Error de conexión al crear plan: ${error.message}`);
+    }
+  };
+
+  // Eliminar plan
+  const handleEliminarPlan = async (planId) => {
+    if (!window.confirm('¿Seguro que querés eliminar este plan?')) return;
+    const token = localStorage.getItem('token');
+
+    try {
+      const response = await fetch(`${API_URL}/planes/${planId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        cargarDatos();
+      } else {
+        alert('No se pudo eliminar el plan.');
+      }
+    } catch (error) {
+      alert('Error de red al eliminar el plan.');
+    }
   };
 
   const enviarWhatsApp = (socio) => {
@@ -248,13 +330,6 @@ export default function PantallaRecepcion() {
   const totalVencidos = socios.filter((s) => s.estado === 'BAJA').length;
 
   const listaSeguraPlanes = Array.isArray(planes) ? planes : [];
-  const planesMasCaros = [...listaSeguraPlanes]
-    .sort((a, b) => {
-      const precioA = Number(a.precio || a.monto || a.valor || 0);
-      const precioB = Number(b.precio || b.monto || b.valor || 0);
-      return precioB - precioA;
-    })
-    .slice(0, 2);
 
   return (
     <div className="min-h-screen bg-[#111315] text-white p-4 md:p-8 font-sans">
@@ -270,13 +345,28 @@ export default function PantallaRecepcion() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-2.5 w-full md:w-auto">
           <button
             onClick={() => setModalAbierto(true)}
             className="flex-1 md:flex-initial bg-[#C6FF3D] text-black font-bold px-4 py-2.5 rounded-xl hover:bg-[#b0f024] transition-all text-sm"
           >
             + Nuevo socio
           </button>
+          
+          <button
+            onClick={() => setModalPlanesAbierto(true)}
+            className="bg-[#181B1E] hover:bg-zinc-800 text-zinc-200 font-semibold px-3.5 py-2.5 rounded-xl border border-zinc-800 transition-all text-sm flex items-center gap-1.5"
+          >
+            ⚙️ Planes
+          </button>
+
+          <button
+            onClick={abrirReportes}
+            className="bg-[#181B1E] hover:bg-zinc-800 text-zinc-200 font-semibold px-3.5 py-2.5 rounded-xl border border-zinc-800 transition-all text-sm flex items-center gap-1.5"
+          >
+            📊 Reportes
+          </button>
+
           <button
             onClick={handleLogout}
             className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium px-4 py-2.5 rounded-xl transition-all text-sm"
@@ -388,9 +478,11 @@ export default function PantallaRecepcion() {
                         {socio.estado}
                       </span>
                     </td>
-                    <td className="py-3 px-2 text-zinc-400">{socio.plan?.nombre || 'Sin plan'}</td>
+                    <td className="py-3 px-2 text-zinc-400">
+                      {socio.plan?.nombre || 'Sin plan'}
+                      {socio.plan?.precio && <span className="text-zinc-500 text-xs block font-mono">${socio.plan.precio}</span>}
+                    </td>
                     <td className="py-3 px-2 text-center flex items-center justify-center gap-1.5">
-                      {/* BOTÓN COBRAR */}
                       <button
                         onClick={() => setSocioCobrar(socio)}
                         className="px-2.5 py-1 rounded-lg bg-[#C6FF3D] hover:bg-[#b0f024] text-black text-xs font-bold transition-all flex items-center gap-1"
@@ -436,6 +528,127 @@ export default function PantallaRecepcion() {
           onClose={() => setSocioCobrar(null)}
           onSuccess={cargarDatos}
         />
+      )}
+
+      {/* MODAL PLANES */}
+      {modalPlanesAbierto && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#181B1E] border border-zinc-800 rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-bold text-white uppercase flex items-center gap-2">
+                ⚙️ Planes Configurados
+              </h3>
+              <button onClick={() => setModalPlanesAbierto(false)} className="text-zinc-400 hover:text-white font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleCrearPlan} className="bg-[#111315] p-4 rounded-xl border border-zinc-800/80 space-y-3">
+              <p className="text-xs font-bold text-zinc-300 uppercase">Crear Nuevo Plan</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Nombre (ej. Pase Libre)"
+                  value={nuevoPlan.nombre}
+                  onChange={(e) => setNuevoPlan({ ...nuevoPlan, nombre: e.target.value })}
+                  className="bg-[#181B1E] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#C6FF3D]"
+                  required
+                />
+                <input
+                  type="number"
+                  placeholder="Precio ($)"
+                  value={nuevoPlan.precio}
+                  onChange={(e) => setNuevoPlan({ ...nuevoPlan, precio: e.target.value })}
+                  className="bg-[#181B1E] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#C6FF3D]"
+                  required
+                />
+              </div>
+              <button type="submit" className="w-full bg-[#C6FF3D] hover:bg-[#b0f024] text-black font-bold py-2 rounded-xl text-xs transition-all">
+                + Agregar Plan
+              </button>
+            </form>
+
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <p className="text-xs font-bold text-zinc-400 uppercase">Mis Planes Actuales</p>
+              {listaSeguraPlanes.length === 0 ? (
+                <p className="text-xs text-zinc-500 italic">No tenés planes creados todavía.</p>
+              ) : (
+                listaSeguraPlanes.map((p) => (
+                  <div key={p.id} className="flex justify-between items-center bg-[#111315] px-3.5 py-2.5 rounded-xl border border-zinc-800/60 text-xs">
+                    <div>
+                      <span className="font-bold text-white block">{p.nombre}</span>
+                      <span className="text-[#C6FF3D] font-mono">${p.precio}</span>
+                    </div>
+                    <button onClick={() => handleEliminarPlan(p.id)} className="text-zinc-500 hover:text-red-400 p-1" title="Eliminar Plan">
+                      🗑️
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL REPORTES */}
+      {modalReportesAbierto && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#181B1E] border border-zinc-800 rounded-2xl p-6 max-w-2xl w-full space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <div>
+                <h3 className="text-lg font-black text-white uppercase flex items-center gap-2">
+                  📊 Balance e Ingresos del Mes
+                </h3>
+                <p className="text-xs text-zinc-400 font-medium capitalize">
+                  {datosReporte?.mesActual || 'Mes en curso'}
+                </p>
+              </div>
+              <button onClick={() => setModalReportesAbierto(false)} className="text-zinc-400 hover:text-white font-bold text-lg">✕</button>
+            </div>
+
+            {cargandoReporte ? (
+              <div className="py-12 text-center text-zinc-500 text-sm">Calculando caja y totales...</div>
+            ) : datosReporte ? (
+              <div className="space-y-5">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-[#111315] border border-zinc-800 p-4 rounded-xl">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase block">Recaudado Total</span>
+                    <p className="text-xl font-black text-[#C6FF3D] mt-1">${datosReporte.recaudacionTotal?.toLocaleString('es-AR')}</p>
+                  </div>
+                  <div className="bg-[#111315] border border-zinc-800 p-4 rounded-xl">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase block">💵 Efectivo</span>
+                    <p className="text-xl font-black text-white mt-1">${datosReporte.totalEfectivo?.toLocaleString('es-AR')}</p>
+                  </div>
+                  <div className="bg-[#111315] border border-zinc-800 p-4 rounded-xl">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase block">📱 Transferencias</span>
+                    <p className="text-xl font-black text-blue-400 mt-1">${datosReporte.totalTransferencia?.toLocaleString('es-AR')}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-zinc-400 uppercase mb-2">Cobros del Mes ({datosReporte.cantidadCobros})</p>
+                  <div className="max-h-52 overflow-y-auto divide-y divide-zinc-800/60 bg-[#111315] rounded-xl border border-zinc-800/80 px-3">
+                    {!datosReporte.historialPagos || datosReporte.historialPagos.length === 0 ? (
+                      <p className="text-xs text-zinc-500 py-6 text-center">No hay cobros registrados este mes.</p>
+                    ) : (
+                      datosReporte.historialPagos.map((pago) => (
+                        <div key={pago.id} className="py-2.5 flex justify-between items-center text-xs">
+                          <div>
+                            <span className="font-bold text-white block">{pago.socio?.nombre || 'Socio'}</span>
+                            <span className="text-[10px] text-zinc-500">
+                              {new Date(pago.fechaPago).toLocaleDateString('es-AR')} · {pago.metodoPago}
+                            </span>
+                          </div>
+                          <span className="font-mono font-bold text-[#C6FF3D]">+${Number(pago.monto).toLocaleString('es-AR')}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-red-400">No se pudieron obtener las métricas.</p>
+            )}
+          </div>
+        </div>
       )}
 
       {/* MODAL CREAR SOCIO */}
@@ -487,7 +700,7 @@ export default function PantallaRecepcion() {
                   className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-[#C6FF3D] font-medium focus:outline-none focus:border-[#C6FF3D]"
                 >
                   <option value="" className="text-white">Seleccionar plan...</option>
-                  {(planesMasCaros.length > 0 ? planesMasCaros : listaSeguraPlanes).map((plan) => {
+                  {listaSeguraPlanes.map((plan) => {
                     const precio = plan.precio || plan.monto || plan.valor;
                     return (
                       <option key={plan.id} value={plan.id} className="text-white">
@@ -497,7 +710,7 @@ export default function PantallaRecepcion() {
                   })}
                 </select>
               </div>
-
+              
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"

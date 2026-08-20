@@ -7,6 +7,8 @@ import authRoutes from './routes/auth.routes.js';
 import pagosRoutes from './routes/pagos.routes.js';
 import suscripcionRoutes from './routes/suscripcion.routes.js';
 import planesRoutes from './routes/planes.routes.js';
+import reportesRoutes from './routes/reportes.routes.js';
+
 
 const app = express();
 
@@ -26,5 +28,6 @@ app.use('/api/asistencias', asistenciasRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/pagos', pagosRoutes);
 app.use('/api/suscripcion', suscripcionRoutes);
+app.use('/api/reportes', reportesRoutes);
 
 export default app;
