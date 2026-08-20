@@ -3,72 +3,64 @@ import prisma from '../lib/prisma.js';
 
 const router = express.Router();
 
+// GET /api/pagos - Listar los pagos del gimnasio del usuario autenticado
+router.get('/', async (req, res) => {
+  try {
+    const usuarioId = req.auth?.id || req.usuario?.id;
+    const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+
+    if (!usuario || !usuario.gimnasioId) {
+      return res.status(403).json({ error: "No autorizado o sin gimnasio asignado" });
+    }
+
+    const pagos = await prisma.pago.findMany({
+      where: { gimnasioId: usuario.gimnasioId },
+      include: { socio: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return res.json(pagos);
+  } catch (error) {
+    console.error("Error al obtener pagos:", error);
+    return res.status(500).json({ error: "Error al obtener los pagos" });
+  }
+});
+
+// POST /api/pagos - Registrar un pago y renovar estado del socio
 router.post('/', async (req, res) => {
   try {
-    const { socioId, gimnasioId, monto, metodoPago } = req.body;
+    const { socioId, monto, metodoPago, meses } = req.body;
+    const usuarioId = req.auth?.id || req.usuario?.id;
 
-    // Normalizamos el socioId directamente como venga (String o Number)
-    const rawSocioId = socioId || req.body.socio_id;
-
-    if (!rawSocioId) {
-      return res.status(400).json({ error: "El socioId es obligatorio." });
+    const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+    if (!usuario || !usuario.gimnasioId) {
+      return res.status(403).json({ error: "No autorizado" });
     }
 
-    // Convertimos a Int si la base de datos usa Ints, o lo dejamos como String si usa UUIDs
-    const parsedSocioId = !isNaN(Number(rawSocioId)) ? Number(rawSocioId) : String(rawSocioId);
-
-    const montoFinal = Number(monto) || 0;
-    const metodoFinal = (metodoPago || req.body.metodo_pago || 'EFECTIVO').toUpperCase();
-
-    // 1. Buscamos al socio
-    const socio = await prisma.socio.findUnique({
-      where: { id: parsedSocioId }
-    });
-
-    if (!socio) {
-      return res.status(404).json({ error: "Socio no encontrado" });
+    if (!socioId || !monto) {
+      return res.status(400).json({ error: "Socio y monto son obligatorios" });
     }
 
-    // 2. Calculamos la nueva fecha de vencimiento (+1 mes)
-    const hoy = new Date();
-    let baseFecha = socio.vencimiento && new Date(socio.vencimiento) > hoy
-      ? new Date(socio.vencimiento)
-      : hoy;
-
-    const nuevaFechaVencimiento = new Date(baseFecha);
-    nuevaFechaVencimiento.setMonth(nuevaFechaVencimiento.getMonth() + 1);
-
-    // 3. Obtenemos el gimnasioId seguro
-    const finalGimnasioId = socio.gimnasioId || (!isNaN(Number(gimnasioId)) ? Number(gimnasioId) : gimnasioId) || 1;
-
-    // 4. Transacción: Creamos pago y actualizamos fecha/estado del socio
-    const [pago, socioActualizado] = await prisma.$transaction([
-      prisma.pago.create({
-        data: {
-          socioId: parsedSocioId,
-          gimnasioId: finalGimnasioId,
-          monto: montoFinal,
-          metodoPago: metodoFinal
-        }
-      }),
-      prisma.socio.update({
-        where: { id: parsedSocioId },
-        data: {
-          vencimiento: nuevaFechaVencimiento,
-          estado: 'ACTIVO'
-        }
-      })
-    ]);
-
-    return res.status(201).json({
-      mensaje: "Pago registrado con éxito",
-      pago,
-      socio: socioActualizado
+    // 1. Crear el registro del pago en la base de datos
+    const nuevoPago = await prisma.pago.create({
+      data: {
+        monto: Number(monto),
+        metodoPago: metodoPago || 'EFECTIVO',
+        socioId: String(socioId),
+        gimnasioId: usuario.gimnasioId
+      }
     });
 
+    // 2. Actualizar el estado del socio a ACTIVO (o renovar su vigencia)
+    await prisma.socio.update({
+      where: { id: String(socioId) },
+      data: { estado: 'ACTIVO' }
+    });
+
+    return res.status(201).json({ mensaje: "Pago registrado con éxito", pago: nuevoPago });
   } catch (error) {
-    console.error("Error al procesar el pago:", error);
-    return res.status(500).json({ error: "Error interno al procesar el pago", detalle: error.message });
+    console.error("Error detallado al registrar pago:", error);
+    return res.status(500).json({ error: "Error al procesar el pago", detalle: error.message });
   }
 });
 
