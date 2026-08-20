@@ -62,14 +62,14 @@ export const crearSocio = async (req, res) => {
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
     let { nombre, apellido, dni, email, telefono, planId } = req.body;
 
-    // Si viene solo un nombre completo en 'nombre', intentamos separar nombre y apellido
+    // Separar nombre y apellido si vienen juntos
     if (nombre && !apellido) {
       const partes = nombre.trim().split(' ');
       if (partes.length > 1) {
         nombre = partes[0];
         apellido = partes.slice(1).join(' ');
       } else {
-        apellido = '-'; // Apellido por defecto si solo se ingresó un término
+        apellido = '-';
       }
     }
 
@@ -77,18 +77,25 @@ export const crearSocio = async (req, res) => {
       return res.status(400).json({ error: 'El nombre es obligatorio' });
     }
 
-    const dataSocio = {
+    // Armamos el objeto de datos dinámicamente para evitar fallos de claves foráneas
+    const dataPrisma = {
       nombre,
       apellido: apellido || '-',
       dni: dni || null,
       email: email || null,
       telefono: telefono || null,
       gimnasioId: gimnasioId,
-      ...(planId ? { planId } : {})
     };
 
+    // Conectar el plan solo si se seleccionó uno válido
+    if (planId && planId !== '') {
+      dataPrisma.plan = {
+        connect: { id: planId }
+      };
+    }
+
     const nuevoSocio = await prisma.socio.create({
-      data: dataSocio,
+      data: dataPrisma,
       include: {
         plan: true
       }
@@ -99,10 +106,12 @@ export const crearSocio = async (req, res) => {
       socio: nuevoSocio,
     });
   } catch (error) {
-    console.error('Error al crear socio:', error);
+    console.error('Error detallado al crear socio:', error);
+    
+    // Retornar la causa exacta de Prisma para no quedar a ciegas
     return res.status(500).json({
       error: 'Error interno al registrar el socio',
-      detalle: error.message,
+      detalle: error.message || 'Error en la base de datos'
     });
   }
 };

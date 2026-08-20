@@ -73,57 +73,65 @@ export default function PantallaRecepcion() {
     cargarDatos();
   }, []);
 
-const handleCrearSocio = async (e) => {
-    e.preventDefault();
-    const token = localStorage.getItem('token');
+// Crear un nuevo socio
+  export const crearSocio = async (req, res) => {
+   try {
+     const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
+     let { nombre, apellido, dni, email, telefono, planId } = req.body;
 
-    const nombreTexto = nuevoSocio.nombre?.trim();
+     // Separar nombre y apellido si vienen juntos
+     if (nombre && !apellido) {
+       const partes = nombre.trim().split(' ');
+       if (partes.length > 1) {
+         nombre = partes[0];
+         apellido = partes.slice(1).join(' ');
+       } else {
+         apellido = '-';
+       }
+     }
 
-    if (!nombreTexto) {
-      alert('El nombre es obligatorio.');
-      return;
-    }
+     if (!nombre) {
+       return res.status(400).json({ error: 'El nombre es obligatorio' });
+     }
 
-    // Separar nombre y apellido por si el backend requiere ambos campos explícitamente
-    const partes = nombreTexto.split(' ');
-    const nombre = partes[0];
-    const apellido = partes.length > 1 ? partes.slice(1).join(' ') : '-';
+    // Armamos el objeto de datos dinámicamente para evitar fallos de claves foráneas
+     const dataPrisma = {
+       nombre,
+       apellido: apellido || '-',
+       dni: dni || null,
+       email: email || null,
+       telefono: telefono || null,
+       gimnasioId: gimnasioId,
+     };
 
-    const payload = {
-      nombre: nombre,
-      apellido: apellido,
-      telefono: nuevoSocio.telefono ? nuevoSocio.telefono.trim() : '',
-      ...(nuevoSocio.planId ? { planId: nuevoSocio.planId } : {})
-    };
+     // Conectar el plan solo si se seleccionó uno válido
+     if (planId && planId !== '') {
+       dataPrisma.plan = {
+         connect: { id: planId }
+       };
+     }
 
-    try {
-      const res = await fetch(`${API_URL}/socios`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
+     const nuevoSocio = await prisma.socio.create({
+       data: dataPrisma,
+       include: {
+         plan: true
+       }
       });
 
-      const data = await res.json().catch(() => ({}));
-
-      if (res.ok) {
-        setModalAbierto(false);
-        setNuevoSocio({ nombre: '', telefono: '', planId: '' });
-        cargarDatos();
-      } else {
-        alert(data.error || data.message || 'Error al guardar el socio');
-      }
-    } catch (error) {
-      console.error('Error al crear socio:', error);
-      alert('Error de conexión con el servidor.');
-    }
-  };
-  const handleLogout = () => {
-    localStorage.clear();
-    window.location.reload();
-  };
+     return res.status(201).json({
+       mensaje: 'Socio creado exitosamente',
+       socio: nuevoSocio,
+     });
+   } catch (error) {
+     console.error('Error detallado al crear socio:', error);
+    
+    // Retornar la causa exacta de Prisma para no quedar a ciegas
+     return res.status(500).json({
+       error: 'Error interno al registrar el socio',
+       detalle: error.message || 'Error en la base de datos'
+     });
+   }
+ };
 
   const sociosFiltrados = socios.filter((socio) => {
     const coincideTexto =
