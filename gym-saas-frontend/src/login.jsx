@@ -26,13 +26,19 @@ export default function Login({ onLoginSuccess }) {
           localStorage.setItem('gimnasioId', data.usuario.gimnasioId);
         }
 
-        // Forzar cambio de estado / recarga inmediata
         if (onLoginSuccess) {
           onLoginSuccess(data.token);
         }
         
-        // Recargar la página para que main.tsx lea el localStorage actualizado de inmediato
-        window.location.reload();
+        // REDIRECCIÓN INTELIGENTE SEGÚN EL ROL
+        if (data.usuario && data.usuario.rol === 'SUPERADMIN') {
+          // Si es superadmin, lo mandamos directo al panel global (3era imagen)
+          // Ajusta esta ruta según cómo renderices el panel superadmin en tu app
+          window.location.href = '/superadmin'; 
+        } else {
+          // Si es un gimnasio común, va al panel de socios (2da imagen)
+          window.location.href = '/dashboard';
+        }
       } else {
         alert(data.error || 'Credenciales inválidas');
       }

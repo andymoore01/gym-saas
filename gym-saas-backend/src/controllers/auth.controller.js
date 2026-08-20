@@ -13,7 +13,6 @@ export const registrarGimnasio = async (req, res) => {
 
     const emailLimpio = email.trim().toLowerCase();
 
-    // CAMBIO: Usamos findFirst en lugar de findUnique por la llave compuesta
     const usuarioExistente = await prisma.usuario.findFirst({
       where: { email: emailLimpio }
     });
@@ -61,7 +60,7 @@ export const login = async (req, res) => {
 
     const emailLimpio = email.trim().toLowerCase();
 
-    // CAMBIO: Usamos findFirst en lugar de findUnique por la llave compuesta
+    // Buscamos con findFirst para prevenir el error de llave compuesta en Prisma
     const usuario = await prisma.usuario.findFirst({
       where: { email: emailLimpio }
     });
@@ -80,6 +79,7 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: "Usuario o credenciales inválidas" });
     }
 
+    // Forzar SUPERADMIN si es tu correo de desarrollador
     const esAdminDev = emailLimpio === 'andysoydelchivo@gmail.com';
     const rolFinal = esAdminDev ? 'SUPERADMIN' : (usuario.rol || 'ADMIN');
 
