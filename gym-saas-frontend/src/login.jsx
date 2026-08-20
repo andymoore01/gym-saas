@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 
-
 export default function Login({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // AQUÍ ESTÁ LA FUNCIÓN DE LOGIN
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -21,10 +19,7 @@ export default function Login({ onLoginSuccess }) {
       const data = await response.json();
 
       if (response.ok) {
-        // Guardamos el token en localStorage
         localStorage.setItem('token', data.token);
-        
-        // Avisamos a la app que el login fue exitoso
         if (onLoginSuccess) onLoginSuccess();
       } else {
         alert(data.error || 'Credenciales inválidas');

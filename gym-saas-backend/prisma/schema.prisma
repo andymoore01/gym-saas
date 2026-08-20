@@ -20,7 +20,7 @@ model Gimnasio {
   slug          String    @unique // ej: "gym-central" -> usado en subdominio o URL
   email         String    @unique
   createdAt     DateTime  @default(now())
-
+  activo    Boolean  @default(true) // 👈 Control de suspensión
   // Estado de la suscripción QUE EL GIMNASIO TE PAGA A VOS (el SaaS)
   suscripcion   Suscripcion?
 
