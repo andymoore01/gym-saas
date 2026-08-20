@@ -8,7 +8,9 @@ import './style.css';
 
 function App() {
   const [token, setToken] = useState<string | null>(null);
-  const [route, setRoute] = useState<string>(window.location.hash || window.location.pathname);
+  const [route, setRoute] = useState<string>(
+    window.location.hash || window.location.pathname || window.location.search
+  );
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -16,32 +18,34 @@ function App() {
       setToken(savedToken);
     }
 
-    const handleHashChange = () => {
-      setRoute(window.location.hash || window.location.pathname);
+    const handleRouteChange = () => {
+      setRoute(window.location.hash || window.location.pathname || window.location.search);
     };
 
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('hashchange', handleRouteChange);
+    window.addEventListener('popstate', handleRouteChange);
+    return () => {
+      window.removeEventListener('hashchange', handleRouteChange);
+      window.removeEventListener('popstate', handleRouteChange);
+    };
   }, []);
 
-  // Comprobar si la ruta o el hash solicitan el panel de SuperAdmin
-  const esSuperAdmin = 
-    route.includes('superadmin') || 
-    route.includes('admin') || 
-    window.location.search.includes('vista=admin');
+  // Evaluar la URL completa
+  const currentUrl = window.location.href.toLowerCase();
+  const esSuperAdmin = currentUrl.includes('superadmin') || currentUrl.includes('admin');
 
-  // 1. VISTA SUPERADMIN (Acceso por /#/superadmin, /superadmin o ?vista=admin)
+  // 1. PRIMERA PRIORIDAD: VISTA SUPERADMIN (Carga si la URL contiene "superadmin" o "admin")
   if (esSuperAdmin) {
     return <SuperAdmin onVolver={() => (window.location.href = '/')} />;
   }
 
-  // 2. APP GIMNASIO (con sesión iniciada)
+  // 2. SEGUNDA PRIORIDAD: APP GIMNASIO (si no es admin pero tiene token)
   if (token) {
     return <PantallaRecepcion />;
   }
 
   // 3. LOGIN
-  if (route.includes('login')) {
+  if (currentUrl.includes('login')) {
     return (
       <Login
         onLoginSuccess={(newToken) => {
