@@ -3,19 +3,14 @@ import prisma from '../lib/prisma.js';
 
 const router = express.Router();
 
+// GET /api/planes
 router.get('/', async (req, res) => {
   try {
-    const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1;
-    const parsedGimnasioId = !isNaN(Number(rawGimnasioId)) ? Number(rawGimnasioId) : String(rawGimnasioId);
+    const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || "1";
+    const gimnasioIdString = String(rawGimnasioId);
 
     const planes = await prisma.plan.findMany({
-      where: {
-        OR: [
-          { gimnasioId: parsedGimnasioId },
-          { gimnasioId: String(rawGimnasioId) },
-          { gimnasioId: Number(rawGimnasioId) || 1 }
-        ]
-      },
+      where: { gimnasioId: gimnasioIdString },
       orderBy: { precio: 'asc' }
     });
 
@@ -26,6 +21,7 @@ router.get('/', async (req, res) => {
   }
 });
 
+// POST /api/planes
 router.post('/', async (req, res) => {
   try {
     const { nombre, precio } = req.body;
@@ -34,52 +30,26 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'El nombre y precio son obligatorios' });
     }
 
-    const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1;
-    const parsedGimnasioId = !isNaN(Number(rawGimnasioId)) ? Number(rawGimnasioId) : String(rawGimnasioId);
+    const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || "1";
+    const gimnasioIdString = String(rawGimnasioId);
 
-    let nuevoPlan;
-
-    // Variante 1: Inserción directa básica
-    try {
-      nuevoPlan = await prisma.plan.create({
-        data: {
-          nombre: String(nombre).trim(),
-          precio: Number(precio),
-          gimnasioId: parsedGimnasioId
-        }
-      });
-    } catch (err1) {
-      // Variante 2: Incluyendo duracionMeses por si el schema lo exige
-      try {
-        nuevoPlan = await prisma.plan.create({
-          data: {
-            nombre: String(nombre).trim(),
-            precio: Number(precio),
-            duracionMeses: 1,
-            gimnasioId: parsedGimnasioId
-          }
-        });
-      } catch (err2) {
-        // Variante 3: Mediante relacion connect
-        nuevoPlan = await prisma.plan.create({
-          data: {
-            nombre: String(nombre).trim(),
-            precio: Number(precio),
-            gimnasio: { connect: { id: parsedGimnasioId } }
-          }
-        });
+    // Inserción directa enviando gimnasioId como String
+    const nuevoPlan = await prisma.plan.create({
+      data: {
+        nombre: String(nombre).trim(),
+        precio: Number(precio),
+        gimnasioId: gimnasioIdString
       }
-    }
+    });
 
     return res.status(201).json(nuevoPlan);
   } catch (error) {
-    console.error('Error detallado de Prisma:', error);
-    return res.status(500).json({ 
-      error: error.message || 'Error al escribir en la base de datos' 
-    });
+    console.error('Error al crear plan:', error);
+    return res.status(500).json({ error: error.message || 'Error al crear el plan' });
   }
 });
 
+// DELETE /api/planes/:id
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
