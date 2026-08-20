@@ -19,19 +19,20 @@ export default function Login({ onLoginSuccess }) {
       const data = await response.json();
 
       if (response.ok && data.token) {
-        // Guardar credenciales en el navegador
+        // Guardar token y datos del usuario
         localStorage.setItem('token', data.token);
         if (data.usuario) {
           localStorage.setItem('usuario', JSON.stringify(data.usuario));
           localStorage.setItem('gimnasioId', data.usuario.gimnasioId);
         }
 
-        // Notificar al padre o forzar recarga si no hay callback
+        // Forzar cambio de estado / recarga inmediata
         if (onLoginSuccess) {
           onLoginSuccess(data.token);
-        } else {
-          window.location.reload();
         }
+        
+        // Recargar la página para que main.tsx lea el localStorage actualizado de inmediato
+        window.location.reload();
       } else {
         alert(data.error || 'Credenciales inválidas');
       }
