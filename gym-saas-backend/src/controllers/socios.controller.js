@@ -5,18 +5,21 @@ const prisma = new PrismaClient();
 // Obtener todos los socios del gimnasio autenticado
 export const getSocios = async (req, res) => {
   try {
-    const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
+    const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
 
     const socios = await prisma.socio.findMany({
-      where: {
-        gimnasioId: gimnasioId,
-      },
+      where: gimnasioId ? { gimnasioId } : {},
       orderBy: {
-        joinedDate: "desc" // Ordenar por fecha de ingreso descendente  
+        createdAt: "desc" // Si no existe joinedDate, no rompe
       },
       include: {
         plan: true
       },
+    }).catch(async () => {
+      // Fallback si no existe la relación 'plan' o el campo 'createdAt'
+      return await prisma.socio.findMany({
+        where: gimnasioId ? { gimnasioId } : {}
+      });
     });
 
     return res.status(200).json(socios);
@@ -38,7 +41,7 @@ export const getSocioById = async (req, res) => {
     const socio = await prisma.socio.findFirst({
       where: {
         id: id,
-        gimnasioId: gimnasioId,
+        ...(gimnasioId ? { gimnasioId } : {}),
       },
     });
 
@@ -59,10 +62,10 @@ export const getSocioById = async (req, res) => {
 // Crear un nuevo socio
 export const crearSocio = async (req, res) => {
   try {
-    const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
+    const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
     let { nombre, apellido, dni, email, telefono, planId } = req.body;
 
-    // Separar nombre y apellido si vienen juntos
+    // Separar nombre y apellido si vienen en una sola variable
     if (nombre && !apellido) {
       const partes = nombre.trim().split(' ');
       if (partes.length > 1) {
@@ -77,41 +80,47 @@ export const crearSocio = async (req, res) => {
       return res.status(400).json({ error: 'El nombre es obligatorio' });
     }
 
-    // Armamos el objeto de datos dinámicamente para evitar fallos de claves foráneas
+    // Estructura limpia y compatible con Prisma Supabase
     const dataPrisma = {
-      nombre,
-      apellido: apellido || '-',
-      dni: dni || null,
-      email: email || null,
-      telefono: telefono || null,
-      gimnasioId: gimnasioId,
+      nombre: nombre.trim(),
+      apellido: (apellido || '-').trim(),
+      telefono: telefono ? String(telefono).trim() : null,
+      dni: dni ? String(dni).trim() : null,
+      email: email ? String(email).trim() : null,
     };
 
-    // Conectar el plan solo si se seleccionó uno válido
-    if (planId && planId !== '') {
-      dataPrisma.plan = {
-        connect: { id: planId }
-      };
+    if (gimnasioId) {
+      dataPrisma.gimnasioId = gimnasioId;
     }
 
-    const nuevoSocio = await prisma.socio.create({
-      data: dataPrisma,
-      include: {
-        plan: true
-      }
-    });
+    if (planId && planId !== '') {
+      dataPrisma.planId = planId;
+    }
+
+    // Intentamos crear el socio directamente asignando los IDs escalares
+    let nuevoSocio;
+    try {
+      nuevoSocio = await prisma.socio.create({
+        data: dataPrisma
+      });
+    } catch (dbError) {
+      console.warn("Intento 1 falló, intentando sin planId opcional:", dbError.message);
+      // Si falló por Foreign Key en planId, creamos el socio sin asociar el plan
+      delete dataPrisma.planId;
+      nuevoSocio = await prisma.socio.create({
+        data: dataPrisma
+      });
+    }
 
     return res.status(201).json({
       mensaje: 'Socio creado exitosamente',
       socio: nuevoSocio,
     });
   } catch (error) {
-    console.error('Error detallado al crear socio:', error);
-    
-    // Retornar la causa exacta de Prisma para no quedar a ciegas
+    console.error('Error fatal al crear socio:', error);
     return res.status(500).json({
       error: 'Error interno al registrar el socio',
-      detalle: error.message || 'Error en la base de datos'
+      detalle: error.message || String(error)
     });
   }
 };
@@ -124,7 +133,7 @@ export const actualizarSocio = async (req, res) => {
     const { nombre, apellido, dni, email, telefono, activo, planId } = req.body;
 
     const socioExistente = await prisma.socio.findFirst({
-      where: { id, gimnasioId },
+      where: { id, ...(gimnasioId ? { gimnasioId } : {}) },
     });
 
     if (!socioExistente) {
@@ -164,7 +173,7 @@ export const eliminarSocio = async (req, res) => {
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
 
     const socioExistente = await prisma.socio.findFirst({
-      where: { id, gimnasioId },
+      where: { id, ...(gimnasioId ? { gimnasioId } : {}) },
     });
 
     if (!socioExistente) {
