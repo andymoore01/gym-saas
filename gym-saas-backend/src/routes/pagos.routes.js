@@ -7,7 +7,6 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const usuarioId = req.auth?.id || req.usuario?.id;
-    // Cambio clave: Usar findFirst en lugar de findUnique
     const usuario = await prisma.usuario.findFirst({ where: { id: usuarioId } });
 
     if (!usuario || !usuario.gimnasioId) {
@@ -17,23 +16,22 @@ router.get('/', async (req, res) => {
     const pagos = await prisma.pago.findMany({
       where: { gimnasioId: usuario.gimnasioId },
       include: { socio: true },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { fechaPago: 'desc' } // Corregido: fechaPago en lugar de createdAt
     });
 
     return res.json(pagos);
   } catch (error) {
     console.error("Error al obtener pagos:", error);
-    return res.status(500).json({ error: "Error al obtener los pagos" });
+    return res.status(500).json({ error: "Error al obtener los pagos", detalle: error.message });
   }
 });
 
 // POST /api/pagos - Registrar un pago y renovar estado del socio
 router.post('/', async (req, res) => {
   try {
-    const { socioId, monto, metodoPago, meses } = req.body;
+    const { socioId, monto, metodoPago } = req.body;
     const usuarioId = req.auth?.id || req.usuario?.id;
 
-    // Cambio clave: Usar findFirst en lugar de findUnique
     const usuario = await prisma.usuario.findFirst({ where: { id: usuarioId } });
     if (!usuario || !usuario.gimnasioId) {
       return res.status(403).json({ error: "No autorizado" });
@@ -43,13 +41,14 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: "Socio y monto son obligatorios" });
     }
 
-    // 1. Crear el registro del pago en la base de datos
+    // 1. Crear el registro del pago usando fechaPago
     const nuevoPago = await prisma.pago.create({
       data: {
         monto: Number(monto),
         metodoPago: metodoPago || 'EFECTIVO',
         socioId: String(socioId),
-        gimnasioId: usuario.gimnasioId
+        gimnasioId: usuario.gimnasioId,
+        fechaPago: new Date() // Asignar la fecha actual obligatoria
       }
     });
 
