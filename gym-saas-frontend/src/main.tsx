@@ -8,53 +8,43 @@ import './style.css';
 
 function App() {
   const [token, setToken] = useState<string | null>(null);
-  // Leemos si la URL o Hash contienen "superadmin" o "admin"
-  const [esAdminView, setEsAdminView] = useState<boolean>(() => {
-    const urlCompleta = (window.location.href + window.location.hash + window.location.search).toLowerCase();
-    return urlCompleta.includes('superadmin') || urlCompleta.includes('admin');
-  });
+
+  // Leer la URL completa y los parametros de búsqueda en cada render
+  const urlCompleta = window.location.href.toLowerCase();
+  const searchParams = new URLSearchParams(window.location.search);
+  
+  // Detección estricta de solicitud SuperAdmin
+  const esAdmin = 
+    urlCompleta.includes('superadmin') || 
+    urlCompleta.includes('admin') || 
+    searchParams.get('admin') === 'true' ||
+    searchParams.get('vista') === 'admin';
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
     if (savedToken) {
       setToken(savedToken);
     }
-
-    // Escuchar cambios en la URL/Hash en tiempo real
-    const revisarRuta = () => {
-      const url = (window.location.href + window.location.hash + window.location.search).toLowerCase();
-      setEsAdminView(url.includes('superadmin') || url.includes('admin'));
-    };
-
-    window.addEventListener('hashchange', revisarRuta);
-    window.addEventListener('popstate', revisarRuta);
-    return () => {
-      window.removeEventListener('hashchange', revisarRuta);
-      window.removeEventListener('popstate', revisarRuta);
-    };
   }, []);
 
-  // 1. SI PIDE VISTA DE SUPERADMIN -> RENDERIZAR PANEL DE CONTROL GLOBAL
-  if (esAdminView) {
+  // 1. SI PIDE ADMIN, MOSTRAR EXCLUSIVAMENTE SUPERADMIN (PRIORIDAD 1)
+  if (esAdmin) {
     return (
       <SuperAdmin 
         onVolver={() => {
-          window.location.hash = '';
-          window.location.search = '';
-          window.location.pathname = '/';
+          window.location.href = window.location.origin;
         }} 
       />
     );
   }
 
-  // 2. SI NO ES ADMIN Y TIENE TOKEN -> VISTA RECEPCIÓN/SISTEMA
+  // 2. SI NO ES ADMIN Y HAY TOKEN -> APP DE RECEPCIÓN
   if (token) {
     return <PantallaRecepcion />;
   }
 
-  // 3. LOGIN
-  const urlLower = window.location.href.toLowerCase();
-  if (urlLower.includes('login')) {
+  // 3. PÁGINA DE LOGIN
+  if (urlCompleta.includes('login')) {
     return (
       <Login
         onLoginSuccess={(newToken) => {
@@ -66,7 +56,7 @@ function App() {
   }
 
   // 4. LANDING PAGE
-  return <LandingPage onGoToLogin={() => (window.location.href = '/#/login')} />;
+  return <LandingPage onGoToLogin={() => (window.location.href = '/?login=true')} />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
