@@ -13,9 +13,9 @@ export const getSocios = async (req, res) => {
       },
       orderBy: {
         joinedDate: "desc" // Ordenar por fecha de ingreso descendente  
-        },
-        include: {
-          plan: true
+      },
+      include: {
+        plan: true
       },
     });
 
@@ -60,21 +60,38 @@ export const getSocioById = async (req, res) => {
 export const crearSocio = async (req, res) => {
   try {
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
-    const { nombre, apellido, dni, email, telefono } = req.body;
+    let { nombre, apellido, dni, email, telefono, planId } = req.body;
 
-    if (!nombre || !apellido) {
-      return res.status(400).json({ error: 'Nombre y apellido son requeridos' });
+    // Si viene solo un nombre completo en 'nombre', intentamos separar nombre y apellido
+    if (nombre && !apellido) {
+      const partes = nombre.trim().split(' ');
+      if (partes.length > 1) {
+        nombre = partes[0];
+        apellido = partes.slice(1).join(' ');
+      } else {
+        apellido = '-'; // Apellido por defecto si solo se ingresó un término
+      }
     }
 
+    if (!nombre) {
+      return res.status(400).json({ error: 'El nombre es obligatorio' });
+    }
+
+    const dataSocio = {
+      nombre,
+      apellido: apellido || '-',
+      dni: dni || null,
+      email: email || null,
+      telefono: telefono || null,
+      gimnasioId: gimnasioId,
+      ...(planId ? { planId } : {})
+    };
+
     const nuevoSocio = await prisma.socio.create({
-      data: {
-        nombre,
-        apellido,
-        dni,
-        email,
-        telefono,
-        gimnasioId: gimnasioId,
-      },
+      data: dataSocio,
+      include: {
+        plan: true
+      }
     });
 
     return res.status(201).json({
@@ -95,7 +112,7 @@ export const actualizarSocio = async (req, res) => {
   try {
     const { id } = req.params;
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
-    const { nombre, apellido, dni, email, telefono, activo } = req.body;
+    const { nombre, apellido, dni, email, telefono, activo, planId } = req.body;
 
     const socioExistente = await prisma.socio.findFirst({
       where: { id, gimnasioId },
@@ -114,6 +131,7 @@ export const actualizarSocio = async (req, res) => {
         email,
         telefono,
         activo,
+        ...(planId ? { planId } : {})
       },
     });
 

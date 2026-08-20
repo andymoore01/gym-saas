@@ -73,8 +73,7 @@ export default function PantallaRecepcion() {
     cargarDatos();
   }, []);
 
-  // Crear nuevo socio enviando todas las variantes posibles de campos para evitar errores de validación
-  const handleCrearSocio = async (e) => {
+const handleCrearSocio = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
 
@@ -85,10 +84,14 @@ export default function PantallaRecepcion() {
       return;
     }
 
+    // Separar nombre y apellido por si el backend requiere ambos campos explícitamente
+    const partes = nombreTexto.split(' ');
+    const nombre = partes[0];
+    const apellido = partes.length > 1 ? partes.slice(1).join(' ') : '-';
+
     const payload = {
-      nombre: nombreTexto,
-      nombreApellido: nombreTexto,
-      nombreCompleto: nombreTexto,
+      nombre: nombre,
+      apellido: apellido,
       telefono: nuevoSocio.telefono ? nuevoSocio.telefono.trim() : '',
       ...(nuevoSocio.planId ? { planId: nuevoSocio.planId } : {})
     };
@@ -117,7 +120,6 @@ export default function PantallaRecepcion() {
       alert('Error de conexión con el servidor.');
     }
   };
-
   const handleLogout = () => {
     localStorage.clear();
     window.location.reload();
