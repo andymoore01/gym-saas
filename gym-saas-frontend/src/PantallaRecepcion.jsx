@@ -68,16 +68,20 @@ export default function PantallaRecepcion() {
   }, []);
 
   // Crear un nuevo socio enviando nombre y nombreApellido para garantizar compatibilidad con el backend
+  // Guardar nuevo socio adaptado a cualquier validación de backend
   const handleCrearSocio = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
 
+    const valorNombre = nuevoSocio.nombre.trim();
+
+    // Enviamos múltiples variaciones del nombre para cubrir la validación del backend
     const payload = {
-      nombre: nuevoSocio.nombre.trim(),
-      nombreApellido: nuevoSocio.nombre.trim(),
-      telefono: nuevoSocio.telefono.trim(),
-      ...(nuevoSocio.planId && nuevoSocio.planId !== '' ? { planId: nuevoSocio.planId } : {}),
-      ...(nuevoSocio.notas ? { notas: nuevoSocio.notas.trim() } : {})
+      nombre: valorNombre,
+      nombreApellido: valorNombre,
+      apellido: '', // Si tu backend exige la propiedad 'apellido'
+      telefono: nuevoSocio.telefono ? nuevoSocio.telefono.trim() : '',
+      ...(nuevoSocio.planId ? { planId: nuevoSocio.planId } : {})
     };
 
     try {
