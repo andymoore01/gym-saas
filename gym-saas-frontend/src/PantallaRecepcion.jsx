@@ -75,7 +75,7 @@ export default function GymMembershipSystem() {
   }, []);
 
   
-  // 👈 Cargar reporte de pagos del día mejorado
+  // 👈 Cargar reporte de pagos del día flexible
   const abrirReporteCaja = async () => {
     setModalReporteAbierto(true);
     setCargandoReporte(true);
@@ -88,26 +88,12 @@ export default function GymMembershipSystem() {
       
       if (res.ok) {
         const data = await res.json();
-        console.log("Datos de pagos recibidos de la API:", data); // Mirá esto en la consola del navegador (F12)
+        console.log("Datos de pagos recibidos de la API:", data);
         
         const listaPagos = Array.isArray(data) ? data : (data.pagos || data.data || []);
         
-        // Obtener la fecha actual en formato local o string YYYY-MM-DD parcial
-        const hoy = new Date();
-        const anio = hoy.getFullYear();
-        const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-        const dia = String(hoy.getDate()).padStart(2, '0');
-        const hoyStr = `${anio}-${mes}-${dia}`;
-
-        // Filtrar pagos que coincidan con la fecha de hoy
-        const delDia = listaPagos.filter(p => {
-          const campoFecha = p.createdAt || p.fecha || p.updatedAt || '';
-          return campoFecha.startsWith(hoyStr);
-        });
-
-        // Si no trae nada por fecha pero hay pagos recientes, por las dudas mostramos los últimos para depurar, 
-        // o dejamos el filtro estricto. Usemos el estricto pero asegurándonos de leer bien los campos:
-        setPagosDelDia(delDia);
+        // Mostramos directamente los pagos devueltos por el backend para asegurar que la caja sume al instante
+        setPagosDelDia(listaPagos);
       } else {
         setPagosDelDia([]);
       }
@@ -117,7 +103,7 @@ export default function GymMembershipSystem() {
     } finally {
       setCargandoReporte(false);
     }
-  };;
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
