@@ -94,7 +94,7 @@ const handleSendWhatsApp = (member) => {
     cleanPhone = `549${cleanPhone}`;
   }
 
-  const message = `Hola ${member.name}! :hi:  Te escribimos del gimnasio para recordarte que tu cuota vence el ${member.dueDate}. ¡Te esperamos para entrenar! :strong:`;
+  const message = `Hola ${member.name}! Te escribimos del gimnasio para recordarte que tu cuota vence el ${member.dueDate}. ¡Te esperamos para entrenar! `;
 
   const encodedMessage = encodeURIComponent(message);
   window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, "_blank");
