@@ -40,32 +40,49 @@ export default function GymMembershipSystem() {
     notes: "",
   });
 
-  const fetchMembers = async () => {
-    try {
-      const response = await fetch(API_URL);
-      if (!response.ok) throw new Error("Error en la conexión con la API");
-      const data = await response.json();
-      
-      const formattedData = data.map(m => ({
-        id: m.id,
-        name: m.nombre || m.name || "",
-        phone: m.telefono || m.phone || "",
-        plan: m.plan || "libre",
-        customFee: m.monto || m.customFee || 18000,
-        lastPaymentDate: m.fechaUltimoPago ? new Date(m.fechaUltimoPago).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-        dueDate: m.fechaVencimiento ? new Date(m.fechaVencimiento).toISOString().split("T")[0] : daysAhead(30),
-        notes: m.notas || m.notes || ""
-      }));
+const fetchMembers = async () => {
+  try {
+    // 1. Obtenemos el token guardado en la sesión
+    const token = localStorage.getItem('token');
 
-      setMembers(formattedData);
-      setSaveError(false);
-    } catch (e) {
-      console.error("Error al conectar con la API:", e);
-      setSaveError(true);
-    } finally {
+    // 2. Si no hay token, podemos redirigir al login (opcional)
+    if (!token) {
+      console.warn("No hay sesión activa");
       setLoading(false);
+      return;
     }
-  };
+
+    // 3. Hacemos el fetch mandando el token en los headers
+    const response = await fetch(`${API_URL}/api/socios`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` // <--- AQUÍ VA
+      }
+    });
+
+    if (!response.ok) throw new Error("Error en la conexión con la API");
+    const data = await response.json();
+
+    const formattedData = data.map(m => ({
+      id: m.id,
+      name: m.nombre || m.name || "",
+      phone: m.telefono || m.phone || "",
+      plan: m.plan || "libre",
+      customFee: m.monto || m.customFee || 18000,
+      lastPaymentDate: m.fechaUltimoPago ? new Date(m.fechaUltimoPago).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      dueDate: m.fechaVencimiento ? new Date(m.fechaVencimiento).toISOString().split("T")[0] : daysAhead(30),
+      notes: m.notas || m.notes || ""
+    }));
+
+    setMembers(formattedData);
+    setSaveError(false);
+  } catch (e) {
+    console.error("Error al conectar con la API:", e);
+    setSaveError(true);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchMembers();
@@ -143,72 +160,77 @@ const handleSendWhatsApp = (member) => {
   };
 
   const handleSaveMember = async (e) => {
-    e.preventDefault();
-    const today = new Date().toISOString().split("T")[0];
-    const dueDate = daysAhead(30);
+  e.preventDefault();
+  const token = localStorage.getItem('token'); // 1. Obtenemos el token
+  const today = new Date().toISOString().split("T")[0];
+  const dueDate = daysAhead(30);
 
-    const newMemberPayload = {
-      nombre: formData.name,
-      telefono: formData.phone,
-      plan: formData.plan,
-      monto: Number(formData.customFee),
-      notas: formData.notes,
-      fecha_vencimiento: dueDate,
-    };
-
-    try {
-      let res;
-      if (editingMember) {
-        res = await fetch(`${API_URL}/${editingMember.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newMemberPayload),
-        });
-      } else {
-        res = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newMemberPayload),
-        });
-      }
-
-      if (!res.ok) throw new Error("Error en la respuesta del servidor");
-
-      await fetchMembers();
-      setIsModalOpen(false);
-      setSaveError(false);
-    } catch (error) {
-      console.error("Error al guardar en la base de datos:", error);
-      alert("No se pudo guardar en la base de datos. Revisá la terminal de Node para ver el log exacto.");
-      setSaveError(true);
-    }
+  const newMemberPayload = {
+    nombre: formData.name,
+    telefono: formData.phone,
+    plan: formData.plan,
+    monto: Number(formData.customFee),
+    notas: formData.notes,
+    fecha_vencimiento: dueDate,
   };
 
-  const handleDeleteMember = async (id) => {
-    if (!window.confirm("¿Seguro que deseas eliminar este socio de la base de datos?")) return;
-
-    try {
-      const res = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Error al eliminar");
-      
-      await fetchMembers();
-      setSaveError(false);
-    } catch (e) {
-      console.error("Error al eliminar socio:", e);
-      alert("Error al intentar eliminar el socio.");
-      setSaveError(true);
+  try {
+    let res;
+    if (editingMember) {
+      res = await fetch(`${API_URL}/${editingMember.id}`, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` // 2. Enviamos el token
+        },
+        body: JSON.stringify(newMemberPayload),
+      });
+    } else {
+      res = await fetch(API_URL, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` // 2. Enviamos el token
+        },
+        body: JSON.stringify(newMemberPayload),
+      });
     }
-  };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#111315] text-white flex flex-col items-center justify-center gap-4">
-        <style>{FONT_IMPORT}</style>
-        <Loader2 className="w-8 h-8 animate-spin text-[#C6FF3D]" />
-        <p className="font-['Inter'] text-zinc-400">Conectando con el servidor...</p>
-      </div>
-    );
+    if (!res.ok) throw new Error("Error en la respuesta del servidor");
+
+    await fetchMembers();
+    setIsModalOpen(false);
+    setSaveError(false);
+  } catch (error) {
+    console.error("Error al guardar en la base de datos:", error);
+    alert("No se pudo guardar en la base de datos. Revisá la terminal de Node para ver el log exacto.");
+    setSaveError(true);
   }
+};
+
+const handleDeleteMember = async (id) => {
+  if (!window.confirm("¿Seguro que deseas eliminar este socio de la base de datos?")) return;
+
+  const token = localStorage.getItem('token'); // 1. Obtenemos el token
+
+  try {
+    const res = await fetch(`${API_URL}/${id}`, { 
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}` // 2. Enviamos el token
+      }
+    });
+    
+    if (!res.ok) throw new Error("Error al eliminar");
+    
+    await fetchMembers();
+    setSaveError(false);
+  } catch (e) {
+    console.error("Error al eliminar socio:", e);
+    alert("Error al intentar eliminar el socio.");
+    setSaveError(true);
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#111315] text-white font-['Inter'] p-4 md:p-8">

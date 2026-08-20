@@ -46,6 +46,45 @@ export const createSocio = async (req, res) => {
       targetPlanId = planExistente.id;
     }
 
+    // Obtener solo los socios DEL gimnasio autenticado
+export const getSocios = async (req, res) => {
+  try {
+    const { gimnasioId } = req.user;
+
+    const socios = await prisma.socio.findMany({
+      where: { gimnasioId },
+      include: { plan: true }
+    });
+
+    res.json(socios);
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener los socios" });
+  }
+};
+
+// Crear socio asociándolo al gimnasio del token
+export const createSocio = async (req, res) => {
+  try {
+    const { gimnasioId } = req.user;
+    const { nombre, telefono, planId, monto, notas } = req.body;
+
+    const nuevoSocio = await prisma.socio.create({
+      data: {
+        nombre,
+        telefono,
+        planId,
+        monto,
+        notas,
+        gimnasioId // Asignación automática al tenant
+      }
+    });
+
+    res.status(201).json(nuevoSocio);
+  } catch (error) {
+    res.status(500).json({ error: "Error al crear socio" });
+  }
+};
+
     // 3. Crear el socio con el esquema exacto de Prisma
     const nuevoSocio = await prisma.socio.create({
       data: {
