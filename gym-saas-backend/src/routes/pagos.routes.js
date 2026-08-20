@@ -7,16 +7,15 @@ router.post('/', async (req, res) => {
   try {
     const { socioId, gimnasioId, monto, metodoPago } = req.body;
 
-    // Convertimos a Int asegurando que no devuelva NaN
-    const parsedSocioId = parseInt(socioId || req.body.socio_id, 10);
-    const parsedGimnasioId = parseInt(
-      gimnasioId || req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1, 
-      10
-    );
+    // Normalizamos el socioId directamente como venga (String o Number)
+    const rawSocioId = socioId || req.body.socio_id;
 
-    if (isNaN(parsedSocioId)) {
-      return res.status(400).json({ error: "El socioId debe ser un número entero válido." });
+    if (!rawSocioId) {
+      return res.status(400).json({ error: "El socioId es obligatorio." });
     }
+
+    // Convertimos a Int si la base de datos usa Ints, o lo dejamos como String si usa UUIDs
+    const parsedSocioId = !isNaN(Number(rawSocioId)) ? Number(rawSocioId) : String(rawSocioId);
 
     const montoFinal = Number(monto) || 0;
     const metodoFinal = (metodoPago || req.body.metodo_pago || 'EFECTIVO').toUpperCase();
@@ -39,12 +38,15 @@ router.post('/', async (req, res) => {
     const nuevaFechaVencimiento = new Date(baseFecha);
     nuevaFechaVencimiento.setMonth(nuevaFechaVencimiento.getMonth() + 1);
 
-    // 3. Transacción: Creamos pago y actualizamos fecha/estado del socio
+    // 3. Obtenemos el gimnasioId seguro
+    const finalGimnasioId = socio.gimnasioId || (!isNaN(Number(gimnasioId)) ? Number(gimnasioId) : gimnasioId) || 1;
+
+    // 4. Transacción: Creamos pago y actualizamos fecha/estado del socio
     const [pago, socioActualizado] = await prisma.$transaction([
       prisma.pago.create({
         data: {
           socioId: parsedSocioId,
-          gimnasioId: isNaN(parsedGimnasioId) ? socio.gimnasioId : parsedGimnasioId,
+          gimnasioId: finalGimnasioId,
           monto: montoFinal,
           metodoPago: metodoFinal
         }
