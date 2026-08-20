@@ -19,8 +19,20 @@ export default function Login({ onLoginSuccess }) {
       const data = await response.json();
 
       if (response.ok) {
+        // 1. Guardar token y datos de sesión
         localStorage.setItem('token', data.token);
-        if (onLoginSuccess) onLoginSuccess();
+        if (data.usuario) {
+          localStorage.setItem('usuario', JSON.stringify(data.usuario));
+          localStorage.setItem('gimnasioId', data.usuario.gimnasioId);
+        }
+
+        // 2. Notificar al componente padre o recargar
+        if (onLoginSuccess) {
+          onLoginSuccess(data);
+        } else {
+          // Si no recibís el prop onLoginSuccess, forzás la recarga para que el Router/App renderice el Dashboard
+          window.location.reload();
+        }
       } else {
         alert(data.error || 'Credenciales inválidas');
       }
