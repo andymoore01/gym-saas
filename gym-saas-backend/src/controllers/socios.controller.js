@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Obtener todos los socios del gimnasio autenticado
+// Obtener todos los socios
 export const getSocios = async (req, res) => {
   try {
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
@@ -12,41 +12,27 @@ export const getSocios = async (req, res) => {
     }
 
     const socios = await prisma.socio.findMany({
-      where: {
-        gimnasioId: gimnasioId,
-      },
-      orderBy: {
-        joinedDate: "desc"
-      },
-      include: {
-        plan: true
-      },
+      where: { gimnasioId },
+      orderBy: { joinedDate: "desc" },
+      include: { plan: true },
     });
 
     return res.status(200).json(socios);
   } catch (error) {
     console.error('Error al obtener socios:', error);
-    return res.status(500).json({
-      error: 'Error al obtener la lista de socios',
-      detalle: error.message,
-    });
+    return res.status(500).json({ error: 'Error al obtener socios', detalle: error.message });
   }
 };
 
-// Obtener un socio por ID
+// Obtener socio por ID
 export const getSocioById = async (req, res) => {
   try {
     const { id } = req.params;
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
 
     const socio = await prisma.socio.findFirst({
-      where: {
-        id: id,
-        gimnasioId: gimnasioId,
-      },
-      include: {
-        plan: true
-      }
+      where: { id, gimnasioId },
+      include: { plan: true },
     });
 
     if (!socio) {
@@ -56,14 +42,11 @@ export const getSocioById = async (req, res) => {
     return res.status(200).json(socio);
   } catch (error) {
     console.error('Error al obtener socio:', error);
-    return res.status(500).json({
-      error: 'Error al buscar el socio',
-      detalle: error.message,
-    });
+    return res.status(500).json({ error: 'Error al buscar el socio', detalle: error.message });
   }
 };
 
-// Crear un nuevo socio
+// Crear socio
 export const crearSocio = async (req, res) => {
   try {
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
@@ -83,15 +66,11 @@ export const crearSocio = async (req, res) => {
     }
 
     let targetPlanId = planId;
-
     if (!targetPlanId) {
-      const primerPlan = await prisma.plan.findFirst({
-        where: { gimnasioId }
-      });
-
+      const primerPlan = await prisma.plan.findFirst({ where: { gimnasioId } });
       if (!primerPlan) {
         return res.status(400).json({ 
-          error: 'No se puede crear el socio porque el gimnasio no tiene ningún plan de cuota registrado.' 
+          error: 'No se puede crear el socio porque el gimnasio no tiene ningún plan registrado.' 
         });
       }
       targetPlanId = primerPlan.id;
@@ -103,33 +82,25 @@ export const crearSocio = async (req, res) => {
         dni: dni ? String(dni).trim() : null,
         telefono: telefono ? String(telefono).trim() : null,
         notas: notas || null,
-        gimnasioId: gimnasioId,
+        gimnasioId,
         planId: targetPlanId,
       },
-      include: {
-        plan: true
-      }
+      include: { plan: true },
     });
 
-    return res.status(201).json({
-      mensaje: 'Socio creado exitosamente',
-      socio: nuevoSocio,
-    });
+    return res.status(201).json({ mensaje: 'Socio creado exitosamente', socio: nuevoSocio });
   } catch (error) {
-    console.error('Error detallado al crear socio:', error);
-    return res.status(500).json({
-      error: 'Error interno al registrar el socio',
-      detalle: error.message
-    });
+    console.error('Error al crear socio:', error);
+    return res.status(500).json({ error: 'Error al registrar socio', detalle: error.message });
   }
 };
 
-// Actualizar un socio (CORREGIDO: Incluye DNI)
+// Actualizar socio (CORREGIDO Y SEGURO)
 export const actualizarSocio = async (req, res) => {
   try {
     const { id } = req.params;
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
-    const { nombre, dni, telefono, notas, estado, planId } = req.body; // 👈 Agregado 'dni'
+    const { nombre, dni, telefono, notas, estado, planId } = req.body;
 
     const socioExistente = await prisma.socio.findFirst({
       where: { id, gimnasioId },
@@ -139,19 +110,19 @@ export const actualizarSocio = async (req, res) => {
       return res.status(404).json({ error: 'Socio no encontrado' });
     }
 
+    // Armamos el objeto de actualización explícitamente sin sintaxis insegura
+    const updateData = {};
+    if (nombre !== undefined) updateData.nombre = nombre.trim();
+    if (dni !== undefined) updateData.dni = dni ? String(dni).trim() : null;
+    if (telefono !== undefined) updateData.telefono = telefono ? String(telefono).trim() : null;
+    if (notas !== undefined) updateData.notas = notas;
+    if (estado !== undefined) updateData.estado = estado;
+    if (planId !== undefined) updateData.planId = planId;
+
     const socioActualizado = await prisma.socio.update({
       where: { id },
-      data: {
-        ...(nombre ? { nombre: nombre.trim() } : {}),
-        ...(dni !== undefined ? { dni: dni ? String(dni).trim() : null } : {}), // 👈 Guarda el DNI
-        ...(telefono !== undefined ? { telefono: telefono ? String(telefono).trim() : null } : {}),
-        ...(notas !== undefined ? { notas } : {}),
-        ...(estado ? { estado } : {}),
-        ...(planId ? { planId } : {}),
-      },
-      include: {
-        plan: true
-      }
+      data: updateData,
+      include: { plan: true },
     });
 
     return res.status(200).json({
@@ -160,10 +131,7 @@ export const actualizarSocio = async (req, res) => {
     });
   } catch (error) {
     console.error('Error al actualizar socio:', error);
-    return res.status(500).json({
-      error: 'Error al actualizar el socio',
-      detalle: error.message,
-    });
+    return res.status(500).json({ error: 'Error al actualizar socio', detalle: error.message });
   }
 };
 
@@ -181,16 +149,11 @@ export const eliminarSocio = async (req, res) => {
       return res.status(404).json({ error: 'Socio no encontrado' });
     }
 
-    await prisma.socio.delete({
-      where: { id },
-    });
+    await prisma.socio.delete({ where: { id } });
 
     return res.status(200).json({ mensaje: 'Socio eliminado con éxito' });
   } catch (error) {
     console.error('Error al eliminar socio:', error);
-    return res.status(500).json({
-      error: 'Error al eliminar el socio',
-      detalle: error.message,
-    });
+    return res.status(500).json({ error: 'Error al eliminar socio', detalle: error.message });
   }
 };
