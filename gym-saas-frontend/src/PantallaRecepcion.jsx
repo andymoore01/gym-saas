@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { ModalCobro } from './ModalCobro';
 
 const API_URL = 'https://gym-saas-backend-vwm9.onrender.com/api';
 
-export default function PantallaRecepcion() {
+export default function GymMembershipSystem() {
   const [socios, setSocios] = useState([]);
   const [planes, setPlanes] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('Todos');
   const [cargando, setCargando] = useState(true);
   const [mensajeError, setMensajeError] = useState('');
-  
+
   // Modales
   const [modalAbierto, setModalAbierto] = useState(false);
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+  const [socioCobrar, setSocioCobrar] = useState(null);
 
   // Estados de formularios
   const [nuevoSocio, setNuevoSocio] = useState({
@@ -103,7 +105,6 @@ export default function PantallaRecepcion() {
     window.open(url, '_blank');
   };
 
-  // Crear un nuevo socio
   const handleCrearSocio = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
@@ -138,7 +139,6 @@ export default function PantallaRecepcion() {
     }
   };
 
-  // Abrir modal de edicion
   const abrirEditar = (socio) => {
     setSocioEditar({
       id: socio.id,
@@ -150,8 +150,6 @@ export default function PantallaRecepcion() {
     setModalEditarAbierto(true);
   };
 
-  // Guardar edición de socio
-  // Guardar edición de socio
   const handleGuardarEdicion = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
@@ -177,7 +175,6 @@ export default function PantallaRecepcion() {
       });
 
       if (response.ok) {
-        // Actualizamos la lista local directamente para refrescar la UI al instante
         setSocios((prevSocios) =>
           prevSocios.map((s) =>
             s.id === socioEditar.id
@@ -193,7 +190,7 @@ export default function PantallaRecepcion() {
         );
         setModalEditarAbierto(false);
         setSocioEditar(null);
-        await cargarDatos(); // Re-sincronizar con el backend
+        await cargarDatos();
       } else {
         const err = await response.json().catch(() => ({}));
         alert(`Error al actualizar socio (${response.status}): ${err.error || err.detalle || 'No se pudo guardar'}`);
@@ -204,7 +201,6 @@ export default function PantallaRecepcion() {
     }
   };
 
-  // Eliminar socio
   const handleEliminarSocio = async (socio) => {
     const confirmar = window.confirm(`¿Estás seguro de que querés eliminar a ${socio.nombre}?`);
     if (!confirmar) return;
@@ -390,6 +386,15 @@ export default function PantallaRecepcion() {
                     </td>
                     <td className="py-3 px-2 text-zinc-400">{socio.plan?.nombre || 'Sin plan'}</td>
                     <td className="py-3 px-2 text-center flex items-center justify-center gap-1.5">
+                      {/* BOTÓN COBRAR VERDE */}
+                      <button
+                        onClick={() => setSocioCobrar(socio)}
+                        className="px-2.5 py-1 rounded-lg bg-[#C6FF3D] hover:bg-[#b0f024] text-black text-xs font-bold transition-all flex items-center gap-1"
+                        title="Registrar Cobro"
+                      >
+                        💳 Cobrar
+                      </button>
+
                       <button
                         onClick={() => enviarWhatsApp(socio)}
                         className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-all"
@@ -419,6 +424,15 @@ export default function PantallaRecepcion() {
           </div>
         )}
       </div>
+
+      {/* MODAL COBRAR */}
+      {socioCobrar && (
+        <ModalCobro
+          socio={socioCobrar}
+          onClose={() => setSocioCobrar(null)}
+          onSuccess={cargarDatos}
+        />
+      )}
 
       {/* MODAL CREAR SOCIO */}
       {modalAbierto && (
