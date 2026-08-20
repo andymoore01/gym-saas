@@ -59,7 +59,7 @@ router.post('/gimnasios', async (req, res) => {
     const emailLimpio = email.trim().toLowerCase();
 
     // Validar si el email ya existe en la tabla Usuario
-    const usuarioExistente = await prisma.usuario.findUnique({
+    const usuarioExistente = await prisma.usuario.findFirst({
       where: { email: emailLimpio }
     });
 
