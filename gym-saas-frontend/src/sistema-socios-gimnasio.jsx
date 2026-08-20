@@ -80,6 +80,26 @@ export default function GymMembershipSystem() {
     return "active";
   };
 
+const handleSendWhatsApp = (member) => {
+  if (!member.phone) {
+    alert("Este socio no tiene un número de teléfono registrado.");
+    return;
+  }
+
+  // Dejar solo números
+  let cleanPhone = member.phone.replace(/\D/g, "");
+
+  // Si no tiene código de país, agregar el +54 9 de Argentina
+  if (!cleanPhone.startsWith("54")) {
+    cleanPhone = `549${cleanPhone}`;
+  }
+
+  const message = `Hola ${member.name}! 👋 Te escribimos del gimnasio para recordarte que tu cuota vence el ${member.dueDate}. ¡Te esperamos para entrenar! 💪`;
+
+  const encodedMessage = encodeURIComponent(message);
+  window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, "_blank");
+};
+
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
       const matchesSearch =
@@ -362,6 +382,24 @@ export default function GymMembershipSystem() {
             >
               <Trash2 className="w-4 h-4" />
             </button>
+            <div className="flex items-center gap-2 self-end sm:self-center">
+  {/* NUEVO BOTÓN DE WHATSAPP */}
+  <button
+    onClick={() => handleSendWhatsApp(m)}
+    className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+    title="Enviar recordatorio"
+  >
+    💬 Avisar
+  </button>
+
+  {/* BOTÓN DE ELIMINAR QUE YA TENÍAS */}
+  <button
+    onClick={() => handleDeleteMember(m.id)}
+    className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-xl transition-all"
+  >
+    <Trash2 className="w-4 h-4" />
+  </button>
+</div>
           </div>
         </div>
       );
