@@ -4,21 +4,28 @@ const prisma = require("../lib/prisma");
 const registrarPagoSchema = z.object({
   socioId: z.string(),
   metodoPago: z.enum(["EFECTIVO", "TRANSFERENCIA", "TARJETA"]).default("EFECTIVO"),
-  monto: z.number().positive().optional(), // Si no se pasa monto, usa el del plan
-  meses: z.number().int().positive().default(1), // Cantidad de meses a renovar (por defecto 1)
+  monto: z.number().positive().optional(),
+  meses: z.number().int().positive().default(1),
 });
 
 async function registrarPago(req, res) {
   const parsed = registrarPagoSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
+    return res.status(400).json({ error: "Datos de pago inválidos", detalle: parsed.error.flatten() });
   }
 
   const { socioId, metodoPago, monto, meses } = parsed.data;
 
+  // Extracción segura del gimnasioId
+  const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
+
+  if (!gimnasioId) {
+    return res.status(401).json({ error: "No se identificó el gimnasio autenticado" });
+  }
+
   try {
     const socio = await prisma.socio.findFirst({
-      where: { id: socioId, gimnasioId: req.auth.gimnasioId },
+      where: { id: socioId, gimnasioId },
       include: { plan: true },
     });
 
@@ -26,10 +33,8 @@ async function registrarPago(req, res) {
       return res.status(404).json({ error: "Socio no encontrado en este gimnasio" });
     }
 
-    // Calcular el monto a cobrar
     const montoFinal = monto ?? (socio.plan ? socio.plan.precio : 0);
 
-    // Calcular la nueva fecha de vencimiento
     const hoy = new Date();
     let baseFecha = socio.vencimiento && new Date(socio.vencimiento) > hoy
       ? new Date(socio.vencimiento)
@@ -38,12 +43,11 @@ async function registrarPago(req, res) {
     const nuevaFechaVencimiento = new Date(baseFecha);
     nuevaFechaVencimiento.setMonth(nuevaFechaVencimiento.getMonth() + meses);
 
-    // Transacción: crea el registro de pago y renueva al socio en una sola operación
     const [pago, socioActualizado] = await prisma.$transaction([
       prisma.pago.create({
         data: {
           socioId,
-          gimnasioId: req.auth.gimnasioId,
+          gimnasioId,
           metodoPago,
           monto: montoFinal,
         },
@@ -63,21 +67,18 @@ async function registrarPago(req, res) {
       socio: socioActualizado,
     });
   } catch (error) {
-    console.error("Error al registrar pago:", error);
-    return res.status(500).json({ error: "Error interno al registrar el pago" });
+    console.error("Error al registrar pago en backend:", error);
+    return res.status(500).json({ error: "Error interno al registrar el pago", detalle: error.message });
   }
 }
 
-// Historial de pagos del gimnasio
 async function getPagos(req, res) {
   try {
-    const gimnasioId = req.auth.gimnasioId;
+    const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
     const pagos = await prisma.pago.findMany({
       where: { gimnasioId },
       include: {
-        socio: {
-          select: { nombre: true, dni: true },
-        },
+        socio: { select: { nombre: true, dni: true } },
       },
       orderBy: { fechaPago: "desc" },
     });
@@ -89,10 +90,9 @@ async function getPagos(req, res) {
   }
 }
 
-// Comparativo mensual: altas e ingresos
 async function comparativoMensual(req, res) {
   try {
-    const gimnasioId = req.auth.gimnasioId;
+    const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
     const desde = new Date();
     desde.setMonth(desde.getMonth() - 5);
     desde.setDate(1);
