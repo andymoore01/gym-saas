@@ -8,9 +8,11 @@ import './style.css';
 
 function App() {
   const [token, setToken] = useState<string | null>(null);
-  const [route, setRoute] = useState<string>(
-    window.location.hash || window.location.pathname || window.location.search
-  );
+  // Leemos si la URL o Hash contienen "superadmin" o "admin"
+  const [esAdminView, setEsAdminView] = useState<boolean>(() => {
+    const urlCompleta = (window.location.href + window.location.hash + window.location.search).toLowerCase();
+    return urlCompleta.includes('superadmin') || urlCompleta.includes('admin');
+  });
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -18,34 +20,41 @@ function App() {
       setToken(savedToken);
     }
 
-    const handleRouteChange = () => {
-      setRoute(window.location.hash || window.location.pathname || window.location.search);
+    // Escuchar cambios en la URL/Hash en tiempo real
+    const revisarRuta = () => {
+      const url = (window.location.href + window.location.hash + window.location.search).toLowerCase();
+      setEsAdminView(url.includes('superadmin') || url.includes('admin'));
     };
 
-    window.addEventListener('hashchange', handleRouteChange);
-    window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('hashchange', revisarRuta);
+    window.addEventListener('popstate', revisarRuta);
     return () => {
-      window.removeEventListener('hashchange', handleRouteChange);
-      window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('hashchange', revisarRuta);
+      window.removeEventListener('popstate', revisarRuta);
     };
   }, []);
 
-  // Evaluar la URL completa
-  const currentUrl = window.location.href.toLowerCase();
-  const esSuperAdmin = currentUrl.includes('superadmin') || currentUrl.includes('admin');
-
-  // 1. PRIMERA PRIORIDAD: VISTA SUPERADMIN (Carga si la URL contiene "superadmin" o "admin")
-  if (esSuperAdmin) {
-    return <SuperAdmin onVolver={() => (window.location.href = '/')} />;
+  // 1. SI PIDE VISTA DE SUPERADMIN -> RENDERIZAR PANEL DE CONTROL GLOBAL
+  if (esAdminView) {
+    return (
+      <SuperAdmin 
+        onVolver={() => {
+          window.location.hash = '';
+          window.location.search = '';
+          window.location.pathname = '/';
+        }} 
+      />
+    );
   }
 
-  // 2. SEGUNDA PRIORIDAD: APP GIMNASIO (si no es admin pero tiene token)
+  // 2. SI NO ES ADMIN Y TIENE TOKEN -> VISTA RECEPCIÓN/SISTEMA
   if (token) {
     return <PantallaRecepcion />;
   }
 
   // 3. LOGIN
-  if (currentUrl.includes('login')) {
+  const urlLower = window.location.href.toLowerCase();
+  if (urlLower.includes('login')) {
     return (
       <Login
         onLoginSuccess={(newToken) => {
