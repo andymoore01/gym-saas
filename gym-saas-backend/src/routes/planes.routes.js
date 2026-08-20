@@ -6,8 +6,8 @@ const router = express.Router();
 // GET /api/planes - Obtener todos los planes del gimnasio
 router.get('/', async (req, res) => {
   try {
-    const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1;
-    const parsedGimnasioId = !isNaN(Number(gimnasioId)) ? Number(gimnasioId) : String(gimnasioId);
+    const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1;
+    const parsedGimnasioId = !isNaN(Number(rawGimnasioId)) ? Number(rawGimnasioId) : String(rawGimnasioId);
 
     const planes = await prisma.plan.findMany({
       where: { gimnasioId: parsedGimnasioId },
@@ -21,31 +21,34 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/planes - Crear un nuevo plan personalizado
+// POST /api/planes - Crear un nuevo plan
 router.post('/', async (req, res) => {
   try {
-    const { nombre, precio, descripcion } = req.body;
+    const { nombre, precio } = req.body;
 
-    if (!nombre || !precio) {
+    if (!nombre || precio === undefined) {
       return res.status(400).json({ error: 'El nombre y el precio del plan son obligatorios' });
     }
 
-    const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1;
-    const parsedGimnasioId = !isNaN(Number(gimnasioId)) ? Number(gimnasioId) : String(gimnasioId);
+    const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1;
+    const parsedGimnasioId = !isNaN(Number(rawGimnasioId)) ? Number(rawGimnasioId) : String(rawGimnasioId);
 
+    // Intentamos crear solo con los campos core obligatorios para evitar fallos por campos extra
     const nuevoPlan = await prisma.plan.create({
       data: {
-        nombre: nombre.trim(),
+        nombre: String(nombre).trim(),
         precio: Number(precio),
-        descripcion: descripcion ? descripcion.trim() : null,
         gimnasioId: parsedGimnasioId
       }
     });
 
     return res.status(201).json(nuevoPlan);
   } catch (error) {
-    console.error('Error al crear plan:', error);
-    return res.status(500).json({ error: 'Error interno al crear el plan' });
+    console.error('Error interno al crear el plan:', error);
+    return res.status(500).json({ 
+      error: 'Error interno al crear el plan', 
+      detalle: error.message 
+    });
   }
 });
 
