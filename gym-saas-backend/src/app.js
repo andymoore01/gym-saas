@@ -25,4 +25,4 @@ app.use('/api/auth', authRoutes);
 app.use('/api/pagos', pagosRoutes);
 app.use('/api/suscripcion', suscripcionRoutes);
 
-export default app;saveError
+export default app;
