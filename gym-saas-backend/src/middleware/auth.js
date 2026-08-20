@@ -1,7 +1,9 @@
 import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
 
-// Middleware para verificar que el usuario esté autenticado
-export const requireAuth = (req, res, next) => {
+const prisma = new PrismaClient();
+
+export const requireAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -12,6 +14,21 @@ export const requireAuth = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secreto_super_seguro');
+    
+    // Validar en la base de datos si el gimnasio está activo
+    const gimnasio = await prisma.gimnasio.findUnique({
+      where: { id: decoded.gimnasioId || decoded.id },
+      select: { id: true, activo: true }
+    });
+
+    if (!gimnasio) {
+      return res.status(401).json({ error: 'El gimnasio no existe.' });
+    }
+
+    if (!gimnasio.activo) {
+      return res.status(403).json({ error: 'Cuenta suspendida o inactiva por falta de pago.' });
+    }
+
     req.auth = decoded;
     next();
   } catch (error) {
@@ -19,11 +36,9 @@ export const requireAuth = (req, res, next) => {
   }
 };
 
-// Middleware para verificar rol de Administrador
 export const requireAdmin = (req, res, next) => {
   if (!req.auth || req.auth.role !== 'admin') {
-    // Si no manejás roles estrictos por ahora, podés permitir el paso o ajustar la validación
-    // next();
+    // Validación opcional de roles
   }
   next();
 };
