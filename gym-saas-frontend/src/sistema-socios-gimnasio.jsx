@@ -390,37 +390,37 @@ export default function PantallaRecepcion() {
                     </td>
                     <td className="py-3 px-2 text-zinc-400">{socio.plan?.nombre || 'Sin plan'}</td>
                     <td className="py-3 px-2 text-center flex items-center justify-center gap-1.5">
-                      {/* BOTÓN COBRAR */}
-                      <button
-                        onClick={() => setSocioCobrar(socio)}
-                        className="px-2.5 py-1 rounded-lg bg-[#C6FF3D] hover:bg-[#b0f024] text-black text-xs font-bold transition-all flex items-center gap-1"
-                        title="Registrar Cobro"
-                      >
-                        💳 Cobrar
-                      </button>
+  {/* BOTÓN COBRAR */}
+  <button
+    onClick={() => setSocioCobrar(socio)}
+    className="px-2.5 py-1 rounded-lg bg-[#C6FF3D] hover:bg-[#b0f024] text-black text-xs font-bold transition-all flex items-center gap-1"
+    title="Registrar Cobro"
+  >
+    💳 Cobrar
+  </button>
 
-                      <button
-                        onClick={() => enviarWhatsApp(socio)}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-all"
-                        title="Avisar por WhatsApp"
-                      >
-                        💬 Avisar
-                      </button>
-                      <button
-                        onClick={() => abrirEditar(socio)}
-                        className="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 text-xs font-semibold transition-all"
-                        title="Editar Socio"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleEliminarSocio(socio)}
-                        className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-semibold transition-all"
-                        title="Eliminar Socio"
-                      >
-                        🗑️
-                      </button>
-                    </td>
+  <button
+    onClick={() => enviarWhatsApp(socio)}
+    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-all"
+    title="Avisar por WhatsApp"
+  >
+    💬 Avisar
+  </button>
+  <button
+    onClick={() => abrirEditar(socio)}
+    className="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 text-xs font-semibold transition-all"
+    title="Editar Socio"
+  >
+    ✏️
+  </button>
+  <button
+    onClick={() => handleEliminarSocio(socio)}
+    className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-semibold transition-all"
+    title="Eliminar Socio"
+  >
+    🗑️
+  </button>
+</td>
                   </tr>
                 ))}
               </tbody>
