@@ -7,7 +7,8 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const usuarioId = req.auth?.id || req.usuario?.id;
-    const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+    // Cambio clave: Usar findFirst en lugar de findUnique
+    const usuario = await prisma.usuario.findFirst({ where: { id: usuarioId } });
 
     if (!usuario || !usuario.gimnasioId) {
       return res.status(403).json({ error: "No autorizado o sin gimnasio asignado" });
@@ -32,7 +33,8 @@ router.post('/', async (req, res) => {
     const { socioId, monto, metodoPago, meses } = req.body;
     const usuarioId = req.auth?.id || req.usuario?.id;
 
-    const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+    // Cambio clave: Usar findFirst en lugar de findUnique
+    const usuario = await prisma.usuario.findFirst({ where: { id: usuarioId } });
     if (!usuario || !usuario.gimnasioId) {
       return res.status(403).json({ error: "No autorizado" });
     }
@@ -51,7 +53,7 @@ router.post('/', async (req, res) => {
       }
     });
 
-    // 2. Actualizar el estado del socio a ACTIVO (o renovar su vigencia)
+    // 2. Actualizar el estado del socio a ACTIVO
     await prisma.socio.update({
       where: { id: String(socioId) },
       data: { estado: 'ACTIVO' }
