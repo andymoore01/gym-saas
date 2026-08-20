@@ -15,7 +15,7 @@ export default function GymMembershipSystem() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
   const [modalPlanesAbierto, setModalPlanesAbierto] = useState(false);
-  const [modalReporteAbierto, setModalReporteAbierto] = useState(false); // 👈 Nuevo Modal Reporte / Caja Diaria
+  const [modalReporteAbierto, setModalReporteAbierto] = useState(false);
   const [socioCobrar, setSocioCobrar] = useState(null);
 
   // Estados de reportes / caja
@@ -74,8 +74,7 @@ export default function GymMembershipSystem() {
     cargarDatos();
   }, []);
 
-  
-  // 👈 Cargar reporte de pagos del día flexible
+  // Cargar reporte de pagos del día
   const abrirReporteCaja = async () => {
     setModalReporteAbierto(true);
     setCargandoReporte(true);
@@ -88,11 +87,7 @@ export default function GymMembershipSystem() {
       
       if (res.ok) {
         const data = await res.json();
-        console.log("Datos de pagos recibidos de la API:", data);
-        
         const listaPagos = Array.isArray(data) ? data : (data.pagos || data.data || []);
-        
-        // Mostramos directamente los pagos devueltos por el backend para asegurar que la caja sume al instante
         setPagosDelDia(listaPagos);
       } else {
         setPagosDelDia([]);
@@ -280,7 +275,19 @@ export default function GymMembershipSystem() {
     return partes[0].slice(0, 2).toUpperCase();
   };
 
-  const sociosFiltrados = socios.filter((socio) => {
+  // LÓGICA DE CÁLCULO DE DÍAS DESDE EL ÚLTIMO PAGO
+  const hoy = new Date();
+  const sociosProcesados = socios.map(socio => {
+    const ultimoPago = (socio.pagos && socio.pagos[0]) ? new Date(socio.pagos[0].fechaPago) : null;
+    const diasPasados = ultimoPago ? Math.floor((hoy - ultimoPago) / (1000 * 60 * 60 * 24)) : 0;
+    return { ...socio, diasPasados };
+  });
+
+  const totalActivos = sociosProcesados.filter(s => s.estado === 'ACTIVO' && s.diasPasados < 28).length;
+  const totalPorVencer = sociosProcesados.filter(s => s.estado === 'ACTIVO' && s.diasPasados >= 28).length;
+  const totalVencidos = sociosProcesados.filter(s => s.estado === 'BAJA' || s.diasPasados >= 30).length;
+
+  const sociosFiltrados = sociosProcesados.filter((socio) => {
     const dniSocio = socio.dni || socio.documento || '';
     const coincideTexto =
       socio.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -288,13 +295,11 @@ export default function GymMembershipSystem() {
       dniSocio.includes(busqueda);
 
     if (filtroEstado === 'Todos') return coincideTexto;
-    if (filtroEstado === 'Al día' || filtroEstado === 'ACTIVO') return coincideTexto && socio.estado === 'ACTIVO';
-    if (filtroEstado === 'Vencidos' || filtroEstado === 'BAJA') return coincideTexto && socio.estado === 'BAJA';
+    if (filtroEstado === 'Al día' || filtroEstado === 'ACTIVO') return coincideTexto && socio.estado === 'ACTIVO' && socio.diasPasados < 28;
+    if (filtroEstado === 'Por Vencer') return coincideTexto && socio.estado === 'ACTIVO' && socio.diasPasados >= 28;
+    if (filtroEstado === 'Vencidos' || filtroEstado === 'BAJA') return coincideTexto && (socio.estado === 'BAJA' || socio.diasPasados >= 30);
     return coincideTexto;
   });
-
-  const totalActivos = socios.filter((s) => s.estado === 'ACTIVO').length;
-  const totalVencidos = socios.filter((s) => s.estado === 'BAJA').length;
 
   // Totales calculados para el reporte diario
   const totalEfectivo = pagosDelDia
@@ -366,21 +371,21 @@ export default function GymMembershipSystem() {
         </div>
       )}
 
-      {/* METRICAS */}
+      {/* METRICAS ACTUALIZADAS */}
       <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-6">
         <div className="bg-[#16191C] border border-zinc-800/80 p-4 rounded-2xl hover:border-zinc-700 transition-all shadow-lg">
-          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Socios Activos</p>
-          <p className="text-2xl font-black text-white mt-1">{totalActivos}</p>
+          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Socios Totales</p>
+          <p className="text-2xl font-black text-white mt-1">{socios.length}</p>
         </div>
-        <div className="bg-[#16191C] border border-zinc-800/80 p-4 rounded-2xl hover:border-[#C6FF3D]/40 transition-all shadow-lg hover:shadow-[0_0_20px_rgba(198,255,61,0.08)]">
+        <div className="bg-[#16191C] border border-zinc-800/80 p-4 rounded-2xl hover:border-[#C6FF3D]/40 transition-all shadow-lg">
           <p className="text-[10px] text-[#C6FF3D] font-bold uppercase tracking-wider">Al Día</p>
           <p className="text-2xl font-black text-[#C6FF3D] mt-1">{totalActivos}</p>
         </div>
-        <div className="bg-[#16191C] border border-zinc-800/80 p-4 rounded-2xl hover:border-amber-400/40 transition-all shadow-lg">
-          <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Por Vencer</p>
-          <p className="text-2xl font-black text-amber-400 mt-1">0</p>
+        <div className="bg-[#16191C] border border-amber-500/30 p-4 rounded-2xl hover:border-amber-400/60 transition-all shadow-lg">
+          <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Por Vencer (+28 días)</p>
+          <p className="text-2xl font-black text-amber-400 mt-1">{totalPorVencer}</p>
         </div>
-        <div className="bg-[#16191C] border border-zinc-800/80 p-4 rounded-2xl hover:border-red-500/40 transition-all shadow-lg">
+        <div className="bg-[#16191C] border border-red-500/30 p-4 rounded-2xl hover:border-red-500/60 transition-all shadow-lg">
           <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Vencidos</p>
           <p className="text-2xl font-black text-red-500 mt-1">{totalVencidos}</p>
         </div>
@@ -398,8 +403,8 @@ export default function GymMembershipSystem() {
           />
         </div>
 
-        <div className="flex bg-[#16191C] border border-zinc-800/80 p-1 rounded-2xl text-xs font-semibold">
-          {['Todos', 'Al día', 'Vencidos'].map((estado) => (
+        <div className="flex bg-[#16191C] border border-zinc-800/80 p-1 rounded-2xl text-xs font-semibold flex-wrap">
+          {['Todos', 'Al día', 'Por Vencer', 'Vencidos'].map((estado) => (
             <button
               key={estado}
               onClick={() => setFiltroEstado(estado)}
@@ -440,64 +445,75 @@ export default function GymMembershipSystem() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
-                {sociosFiltrados.map((socio) => (
-                  <tr key={socio.id} className="hover:bg-zinc-800/30 transition-colors group">
-                    <td className="py-3.5 px-3 font-semibold text-white flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-xs font-black text-[#C6FF3D] shrink-0">
-                        {obtenerIniciales(socio.nombre)}
-                      </div>
-                      <span>{socio.nombre}</span>
-                    </td>
-                    <td className="py-3.5 px-3 text-zinc-400 font-mono text-xs">{socio.dni || socio.documento || '-'}</td>
-                    <td className="py-3.5 px-3 text-zinc-400 font-mono text-xs">{socio.telefono || '-'}</td>
-                    <td className="py-3.5 px-3">
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                          socio.estado === 'ACTIVO'
-                            ? 'bg-[#182813] text-[#C6FF3D] border border-[#C6FF3D]/30'
-                            : 'bg-[#2A1316] text-red-400 border border-red-500/30'
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${socio.estado === 'ACTIVO' ? 'bg-[#C6FF3D] animate-pulse' : 'bg-red-400'}`} />
-                        {socio.estado}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 text-zinc-300 font-medium">
-                      {socio.plan?.nombre || 'Sin plan'}
-                      {socio.plan?.precio && <span className="text-zinc-500 text-xs block font-mono">${socio.plan.precio}</span>}
-                    </td>
-                    <td className="py-3.5 px-3 text-center flex items-center justify-center gap-1.5">
-                      <button
-                        onClick={() => setSocioCobrar(socio)}
-                        className="px-3 py-1.5 rounded-xl bg-[#C6FF3D] hover:bg-[#b0f024] text-black text-xs font-black transition-all shadow-[0_0_12px_rgba(198,255,61,0.25)] flex items-center gap-1 active:scale-95"
-                        title="Registrar Cobro"
-                      >
-                        💳 Cobrar
-                      </button>
-                      <button
-                        onClick={() => enviarWhatsApp(socio)}
-                        className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-all active:scale-95"
-                        title="Avisar por WhatsApp"
-                      >
-                        💬 Avisar
-                      </button>
-                      <button
-                        onClick={() => abrirEditar(socio)}
-                        className="px-2.5 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 text-xs font-semibold transition-all active:scale-95"
-                        title="Editar Socio"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleEliminarSocio(socio)}
-                        className="px-2.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-semibold transition-all active:scale-95"
-                        title="Eliminar Socio"
-                      >
-                        🗑️
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {sociosFiltrados.map((socio) => {
+                  const esPorVencer = socio.estado === 'ACTIVO' && socio.diasPasados >= 28;
+                  const esVencido = socio.estado === 'BAJA' || socio.diasPasados >= 30;
+
+                  return (
+                    <tr key={socio.id} className="hover:bg-zinc-800/30 transition-colors group">
+                      <td className="py-3.5 px-3 font-semibold text-white flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-xs font-black text-[#C6FF3D] shrink-0">
+                          {obtenerIniciales(socio.nombre)}
+                        </div>
+                        <span>{socio.nombre}</span>
+                      </td>
+                      <td className="py-3.5 px-3 text-zinc-400 font-mono text-xs">{socio.dni || socio.documento || '-'}</td>
+                      <td className="py-3.5 px-3 text-zinc-400 font-mono text-xs">{socio.telefono || '-'}</td>
+                      <td className="py-3.5 px-3">
+                        {esVencido ? (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider bg-[#2A1316] text-red-400 border border-red-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                            VENCIDO
+                          </span>
+                        ) : esPorVencer ? (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider bg-amber-950/40 text-amber-400 border border-amber-500/30 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                            POR VENCER ({socio.diasPasados}d)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider bg-[#182813] text-[#C6FF3D] border border-[#C6FF3D]/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#C6FF3D]" />
+                            AL DÍA
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-3 text-zinc-300 font-medium">
+                        {socio.plan?.nombre || 'Sin plan'}
+                        {socio.plan?.precio && <span className="text-zinc-500 text-xs block font-mono">${socio.plan.precio}</span>}
+                      </td>
+                      <td className="py-3.5 px-3 text-center flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => setSocioCobrar(socio)}
+                          className="px-3 py-1.5 rounded-xl bg-[#C6FF3D] hover:bg-[#b0f024] text-black text-xs font-black transition-all shadow-[0_0_12px_rgba(198,255,61,0.25)] flex items-center gap-1 active:scale-95"
+                          title="Registrar Cobro"
+                        >
+                          💳 Cobrar
+                        </button>
+                        <button
+                          onClick={() => enviarWhatsApp(socio)}
+                          className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-all active:scale-95"
+                          title="Avisar por WhatsApp"
+                        >
+                          💬 Avisar
+                        </button>
+                        <button
+                          onClick={() => abrirEditar(socio)}
+                          className="px-2.5 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 text-xs font-semibold transition-all active:scale-95"
+                          title="Editar Socio"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleEliminarSocio(socio)}
+                          className="px-2.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-semibold transition-all active:scale-95"
+                          title="Eliminar Socio"
+                        >
+                          🗑️
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -524,7 +540,6 @@ export default function GymMembershipSystem() {
               <div className="text-center py-10 text-zinc-400 text-sm">Calculando caja diaria...</div>
             ) : (
               <div className="space-y-4">
-                {/* Tarjetas resumen */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-[#0E1012] p-3 rounded-xl border border-zinc-800 text-center">
                     <p className="text-[10px] text-zinc-400 font-bold uppercase">Efectivo</p>
@@ -540,7 +555,6 @@ export default function GymMembershipSystem() {
                   </div>
                 </div>
 
-                {/* Lista de cobros de hoy */}
                 <div className="space-y-2">
                   <p className="text-xs font-bold text-zinc-400 uppercase">Cobros registrados hoy ({pagosDelDia.length})</p>
                   <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
