@@ -2,6 +2,54 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 
+// Función para registrar un gimnasio nuevo (tenant)
+export const registrarGimnasio = async (req, res) => {
+  try {
+    const { nombre, email, password, telefono } = req.body;
+
+    if (!nombre || !email || !password) {
+      return res.status(400).json({ error: "Nombre, email y contraseña son obligatorios" });
+    }
+
+    const emailLimpio = email.trim().toLowerCase();
+
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { email: emailLimpio }
+    });
+
+    if (usuarioExistente) {
+      return res.status(400).json({ error: "El email ya se encuentra registrado" });
+    }
+
+    const nuevoGym = await prisma.gimnasio.create({
+      data: {
+        nombre: nombre.trim(),
+        email: emailLimpio,
+        telefono: telefono ? telefono.trim() : null,
+        estado: 'ACTIVO'
+      }
+    });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await prisma.usuario.create({
+      data: {
+        nombre: `Admin ${nombre.trim()}`,
+        email: emailLimpio,
+        passwordHash: hashedPassword,
+        rol: 'ADMIN',
+        gimnasioId: nuevoGym.id
+      }
+    });
+
+    return res.status(201).json({ mensaje: "Gimnasio registrado con éxito", gimnasio: nuevoGym });
+  } catch (error) {
+    console.error("Error al registrar gimnasio:", error);
+    return res.status(500).json({ error: "Error al registrar el gimnasio", detalle: error.message });
+  }
+};
+
+// Función de inicio de sesión
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -17,7 +65,7 @@ export const login = async (req, res) => {
     });
 
     if (!usuario) {
-      return res.status(401).json({ error: `Usuario no encontrado en la BD para: ${emailLimpio}` });
+      return res.status(401).json({ error: "Usuario o credenciales inválidas" });
     }
 
     const hashGuardado = usuario.passwordHash || usuario.password;
@@ -27,7 +75,7 @@ export const login = async (req, res) => {
 
     const passwordValido = await bcrypt.compare(password, hashGuardado);
     if (!passwordValido) {
-      return res.status(401).json({ error: "Contraseña incorrecta" });
+      return res.status(401).json({ error: "Usuario o credenciales inválidas" });
     }
 
     const esAdminDev = emailLimpio === 'andysoydelchivo@gmail.com';
@@ -55,12 +103,7 @@ export const login = async (req, res) => {
       }
     });
   } catch (error) {
-    // ESTO VA A MOSTRAR EL ERROR REAL EN LA PANTALLA EN VEZ DE "Error interno"
-    console.error("ERROR DETALLADO LOGIN:", error);
-    return res.status(500).json({ 
-      error: "FALLÓ EL LOGIN", 
-      detalle: error.message,
-      stack: error.stack 
-    });
+    console.error("Error crítico en login:", error);
+    return res.status(500).json({ error: "Error interno al iniciar sesión", detalle: error.message });
   }
 };
