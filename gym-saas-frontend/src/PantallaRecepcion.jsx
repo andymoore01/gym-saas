@@ -151,9 +151,15 @@ export default function PantallaRecepcion() {
   };
 
   // Guardar edición de socio
+  // Guardar edición de socio
   const handleGuardarEdicion = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
+
+    if (!socioEditar || !socioEditar.id) {
+      alert('Error: No se encontró el ID del socio a editar');
+      return;
+    }
 
     try {
       const response = await fetch(`${API_URL}/socios/${socioEditar.id}`, {
@@ -162,20 +168,39 @@ export default function PantallaRecepcion() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(socioEditar)
+        body: JSON.stringify({
+          nombre: socioEditar.nombre,
+          dni: socioEditar.dni,
+          telefono: socioEditar.telefono,
+          planId: socioEditar.planId
+        })
       });
 
       if (response.ok) {
+        // Actualizamos la lista local directamente para refrescar la UI al instante
+        setSocios((prevSocios) =>
+          prevSocios.map((s) =>
+            s.id === socioEditar.id
+              ? {
+                  ...s,
+                  nombre: socioEditar.nombre,
+                  dni: socioEditar.dni,
+                  telefono: socioEditar.telefono,
+                  planId: socioEditar.planId
+                }
+              : s
+          )
+        );
         setModalEditarAbierto(false);
         setSocioEditar(null);
-        cargarDatos();
+        await cargarDatos(); // Re-sincronizar con el backend
       } else {
         const err = await response.json().catch(() => ({}));
-        alert(`Error al actualizar socio: ${err.error || 'No se pudo guardar los cambios'}`);
+        alert(`Error al actualizar socio (${response.status}): ${err.error || err.detalle || 'No se pudo guardar'}`);
       }
     } catch (error) {
       console.error('Error al editar:', error);
-      alert('Error de conexión al actualizar.');
+      alert(`Error de conexión al actualizar: ${error.message}`);
     }
   };
 
