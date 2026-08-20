@@ -13,7 +13,8 @@ export const registrarGimnasio = async (req, res) => {
 
     const emailLimpio = email.trim().toLowerCase();
 
-    const usuarioExistente = await prisma.usuario.findUnique({
+    // CAMBIO: Usamos findFirst en lugar de findUnique por la llave compuesta
+    const usuarioExistente = await prisma.usuario.findFirst({
       where: { email: emailLimpio }
     });
 
@@ -60,7 +61,8 @@ export const login = async (req, res) => {
 
     const emailLimpio = email.trim().toLowerCase();
 
-    const usuario = await prisma.usuario.findUnique({
+    // CAMBIO: Usamos findFirst en lugar de findUnique por la llave compuesta
+    const usuario = await prisma.usuario.findFirst({
       where: { email: emailLimpio }
     });
 
