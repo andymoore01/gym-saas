@@ -11,7 +11,6 @@ export default function PantallaRecepcion() {
   const [errorApi, setErrorApi] = useState(false);
   const [modalAbierto, setModalAbierto] = useState(false);
 
-  // Estado para el formulario de nuevo socio
   const [nuevoSocio, setNuevoSocio] = useState({
     nombre: '',
     telefono: '',
@@ -19,35 +18,40 @@ export default function PantallaRecepcion() {
     notas: ''
   });
 
-  // Cargar lista de socios y planes desde el backend
   const cargarDatos = async () => {
     setCargando(true);
     setErrorApi(false);
     const token = localStorage.getItem('token');
 
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+
     try {
-      const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      };
-
-      // Peticiones en paralelo para socios y planes
-      const [resSocios, resPlanes] = await Promise.all([
-        fetch(`${API_URL}/socios`, { headers }),
-        fetch(`${API_URL}/planes`, { headers })
-      ]);
-
-      if (!resSocios.ok) throw new Error('Error al obtener socios');
-      
-      const dataSocios = await resSocios.json();
-      setSocios(Array.isArray(dataSocios) ? dataSocios : []);
-
-      if (resPlanes.ok) {
-        const dataPlanes = await resPlanes.json();
-        setPlanes(Array.isArray(dataPlanes) ? dataPlanes : []);
+      // Intentar cargar socios
+      const resSocios = await fetch(`${API_URL}/socios`, { headers });
+      if (resSocios.ok) {
+        const dataSocios = await resSocios.json();
+        setSocios(Array.isArray(dataSocios) ? dataSocios : []);
+      } else {
+        // Solo si la API responde con un status de error real (ej. 500 o 401)
+        setErrorApi(true);
       }
+
+      // Intentar cargar planes en silencio sin bloquear si no existen
+      try {
+        const resPlanes = await fetch(`${API_URL}/planes`, { headers });
+        if (resPlanes.ok) {
+          const dataPlanes = await resPlanes.json();
+          setPlanes(Array.isArray(dataPlanes) ? dataPlanes : []);
+        }
+      } catch (e) {
+        console.warn('Ruta de planes no disponible aún');
+      }
+
     } catch (error) {
-      console.error('Error cargando datos:', error);
+      console.error('Error de red al conectar con el servidor:', error);
       setErrorApi(true);
     } finally {
       setCargando(false);
@@ -58,7 +62,6 @@ export default function PantallaRecepcion() {
     cargarDatos();
   }, []);
 
-  // Guardar nuevo socio
   const handleCrearSocio = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
@@ -87,7 +90,6 @@ export default function PantallaRecepcion() {
     }
   };
 
-  // Cerrar sesión
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
@@ -95,7 +97,6 @@ export default function PantallaRecepcion() {
     window.location.reload();
   };
 
-  // Filtrado de socios por búsqueda y por estado
   const sociosFiltrados = socios.filter((socio) => {
     const coincideTexto =
       socio.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -107,7 +108,6 @@ export default function PantallaRecepcion() {
     return coincideTexto;
   });
 
-  // Métricas
   const totalActivos = socios.filter((s) => s.estado === 'ACTIVO').length;
   const totalVencidos = socios.filter((s) => s.estado === 'BAJA').length;
 
