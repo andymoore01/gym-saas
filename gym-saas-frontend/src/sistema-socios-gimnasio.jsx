@@ -7,11 +7,13 @@ import {
   AlertTriangle,
   Trash2,
   X,
-  Loader2,
+  CreditCard,
+  CheckCircle,
 } from "lucide-react";
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap');`;
-const API_URL = 'https://gym-saas-backend-vwm9.onrender.com/api/socios';
+const API_URL = 'https://gym-saas-backend-vwm9.onrender.com';
+
 const PLAN_INFO = {
   "3dias": { label: "3 días", defaultFee: 12000 },
   libre: { label: "Libre", defaultFee: 18000 },
@@ -31,7 +33,17 @@ export default function GymMembershipSystem() {
   const [filter, setFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
-  
+
+  // Estados para el Modal de Cobro
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [payingMember, setPayingMember] = useState(null);
+  const [paymentData, setPaymentData] = useState({
+    metodoPago: "EFECTIVO",
+    monto: 18000,
+    meses: 1,
+  });
+  const [processingPayment, setProcessingPayment] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -40,49 +52,46 @@ export default function GymMembershipSystem() {
     notes: "",
   });
 
-const fetchMembers = async () => {
-  try {
-    // 1. Obtenemos el token guardado en la sesión
-    const token = localStorage.getItem('token');
+  const fetchMembers = async () => {
+    try {
+      const token = localStorage.getItem('token');
 
-    // 2. Si no hay token, podemos redirigir al login (opcional)
-    if (!token) {
-      console.warn("No hay sesión activa");
-      setLoading(false);
-      return;
-    }
-
-    // 3. Hacemos el fetch mandando el token en los headers
-    const response = await fetch(`${API_URL}/api/socios`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}` // <--- AQUÍ VA
+      if (!token) {
+        console.warn("No hay sesión activa");
+        setLoading(false);
+        return;
       }
-    });
 
-    if (!response.ok) throw new Error("Error en la conexión con la API");
-    const data = await response.json();
+      const response = await fetch(`${API_URL}/api/socios`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-    const formattedData = data.map(m => ({
-      id: m.id,
-      name: m.nombre || m.name || "",
-      phone: m.telefono || m.phone || "",
-      plan: m.plan || "libre",
-      customFee: m.monto || m.customFee || 18000,
-      lastPaymentDate: m.fechaUltimoPago ? new Date(m.fechaUltimoPago).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-      dueDate: m.fechaVencimiento ? new Date(m.fechaVencimiento).toISOString().split("T")[0] : daysAhead(30),
-      notes: m.notas || m.notes || ""
-    }));
+      if (!response.ok) throw new Error("Error en la conexión con la API");
+      const data = await response.json();
 
-    setMembers(formattedData);
-    setSaveError(false);
-  } catch (e) {
-    console.error("Error al conectar con la API:", e);
-    setSaveError(true);
-  } finally {
-    setLoading(false);
-  }
-};
+      const formattedData = data.map(m => ({
+        id: m.id,
+        name: m.nombre || m.name || "",
+        phone: m.telefono || m.phone || "",
+        plan: m.plan || "libre",
+        customFee: m.monto || m.customFee || m.plan?.precio || 18000,
+        lastPaymentDate: m.updatedAt ? new Date(m.updatedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+        dueDate: m.vencimiento ? new Date(m.vencimiento).toISOString().split("T")[0] : daysAhead(30),
+        notes: m.notas || m.notes || ""
+      }));
+
+      setMembers(formattedData);
+      setSaveError(false);
+    } catch (e) {
+      console.error("Error al conectar con la API:", e);
+      setSaveError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchMembers();
@@ -97,25 +106,71 @@ const fetchMembers = async () => {
     return "active";
   };
 
-const handleSendWhatsApp = (member) => {
-  if (!member.phone) {
-    alert("Este socio no tiene un número de teléfono registrado.");
-    return;
-  }
+  const handleSendWhatsApp = (member) => {
+    if (!member.phone) {
+      alert("Este socio no tiene un número de teléfono registrado.");
+      return;
+    }
 
-  // Dejar solo números
-  let cleanPhone = member.phone.replace(/\D/g, "");
+    let cleanPhone = member.phone.replace(/\D/g, "");
 
-  // Si no tiene código de país, agregar el +54 9 de Argentina
-  if (!cleanPhone.startsWith("54")) {
-    cleanPhone = `549${cleanPhone}`;
-  }
+    if (!cleanPhone.startsWith("54")) {
+      cleanPhone = `549${cleanPhone}`;
+    }
 
-  const message = `Hola ${member.name}! Te escribimos del gimnasio para recordarte que tu cuota vence el ${member.dueDate}. ¡Te esperamos para entrenar! `;
+    const message = `Hola ${member.name}! Te escribimos del gimnasio para recordarte que tu cuota vence el ${member.dueDate}. ¡Te esperamos para entrenar! 💪`;
 
-  const encodedMessage = encodeURIComponent(message);
-  window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, "_blank");
-};
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, "_blank");
+  };
+
+  // Abrir Modal de Cobro
+  const handleOpenPaymentModal = (member) => {
+    setPayingMember(member);
+    setPaymentData({
+      metodoPago: "EFECTIVO",
+      monto: member.customFee || 18000,
+      meses: 1,
+    });
+    setIsPaymentModalOpen(true);
+  };
+
+  // Procesar Registro de Pago
+  const handleConfirmPayment = async (e) => {
+    e.preventDefault();
+    if (!payingMember) return;
+
+    setProcessingPayment(true);
+    const token = localStorage.getItem('token');
+
+    try {
+      const res = await fetch(`${API_URL}/api/pagos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          socioId: payingMember.id,
+          metodoPago: paymentData.metodoPago,
+          monto: Number(paymentData.monto),
+          meses: Number(paymentData.meses),
+        }),
+      });
+
+      if (!res.ok) throw new Error("Error al registrar el pago");
+
+      await fetchMembers();
+      setIsPaymentModalOpen(false);
+      setPayingMember(null);
+      alert("¡Pago registrado y cuota renovada con éxito!");
+    } catch (error) {
+      console.error("Error al registrar el pago:", error);
+      alert("No se pudo registrar el pago. Verificá la conexión con la API.");
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
@@ -160,77 +215,76 @@ const handleSendWhatsApp = (member) => {
   };
 
   const handleSaveMember = async (e) => {
-  e.preventDefault();
-  const token = localStorage.getItem('token'); // 1. Obtenemos el token
-  const today = new Date().toISOString().split("T")[0];
-  const dueDate = daysAhead(30);
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    const dueDate = daysAhead(30);
 
-  const newMemberPayload = {
-    nombre: formData.name,
-    telefono: formData.phone,
-    plan: formData.plan,
-    monto: Number(formData.customFee),
-    notas: formData.notes,
-    fecha_vencimiento: dueDate,
+    const newMemberPayload = {
+      nombre: formData.name,
+      telefono: formData.phone,
+      plan: formData.plan,
+      monto: Number(formData.customFee),
+      notas: formData.notes,
+      fecha_vencimiento: dueDate,
+    };
+
+    try {
+      let res;
+      if (editingMember) {
+        res = await fetch(`${API_URL}/api/socios/${editingMember.id}`, {
+          method: "PUT",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(newMemberPayload),
+        });
+      } else {
+        res = await fetch(`${API_URL}/api/socios`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(newMemberPayload),
+        });
+      }
+
+      if (!res.ok) throw new Error("Error en la respuesta del servidor");
+
+      await fetchMembers();
+      setIsModalOpen(false);
+      setSaveError(false);
+    } catch (error) {
+      console.error("Error al guardar en la base de datos:", error);
+      alert("No se pudo guardar en la base de datos.");
+      setSaveError(true);
+    }
   };
 
-  try {
-    let res;
-    if (editingMember) {
-      res = await fetch(`${API_URL}/${editingMember.id}`, {
-        method: "PUT",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` // 2. Enviamos el token
-        },
-        body: JSON.stringify(newMemberPayload),
+  const handleDeleteMember = async (id) => {
+    if (!window.confirm("¿Seguro que deseas eliminar este socio de la base de datos?")) return;
+
+    const token = localStorage.getItem('token');
+
+    try {
+      const res = await fetch(`${API_URL}/api/socios/${id}`, { 
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
       });
-    } else {
-      res = await fetch(API_URL, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` // 2. Enviamos el token
-        },
-        body: JSON.stringify(newMemberPayload),
-      });
+      
+      if (!res.ok) throw new Error("Error al eliminar");
+      
+      await fetchMembers();
+      setSaveError(false);
+    } catch (e) {
+      console.error("Error al eliminar socio:", e);
+      alert("Error al intentar eliminar el socio.");
+      setSaveError(true);
     }
-
-    if (!res.ok) throw new Error("Error en la respuesta del servidor");
-
-    await fetchMembers();
-    setIsModalOpen(false);
-    setSaveError(false);
-  } catch (error) {
-    console.error("Error al guardar en la base de datos:", error);
-    alert("No se pudo guardar en la base de datos. Revisá la terminal de Node para ver el log exacto.");
-    setSaveError(true);
-  }
-};
-
-const handleDeleteMember = async (id) => {
-  if (!window.confirm("¿Seguro que deseas eliminar este socio de la base de datos?")) return;
-
-  const token = localStorage.getItem('token'); // 1. Obtenemos el token
-
-  try {
-    const res = await fetch(`${API_URL}/${id}`, { 
-      method: "DELETE",
-      headers: {
-        "Authorization": `Bearer ${token}` // 2. Enviamos el token
-      }
-    });
-    
-    if (!res.ok) throw new Error("Error al eliminar");
-    
-    await fetchMembers();
-    setSaveError(false);
-  } catch (e) {
-    console.error("Error al eliminar socio:", e);
-    alert("Error al intentar eliminar el socio.");
-    setSaveError(true);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-[#111315] text-white font-['Inter'] p-4 md:p-8">
@@ -341,95 +395,94 @@ const handleDeleteMember = async (id) => {
         </div>
       </div>
 
- <div className="max-w-6xl mx-auto space-y-3">
-  {filteredMembers.length === 0 ? (
-    <div className="bg-[#181B1E] border border-zinc-800 rounded-2xl p-12 text-center text-zinc-500 text-sm">
-      No se encontraron socios en la base de datos.
-    </div>
-  ) : (
-    filteredMembers.map((m) => {
-      // Extraemos el nombre del plan sea un Objeto (Prisma) o un String
-      const planName = typeof m.plan === 'object' ? m.plan?.nombre : m.plan;
-      const displayPlan = PLAN_INFO[planName]?.label || planName || 'Sin Plan';
+      {/* Lista de Socios */}
+      <div className="max-w-6xl mx-auto space-y-3">
+        {filteredMembers.length === 0 ? (
+          <div className="bg-[#181B1E] border border-zinc-800 rounded-2xl p-12 text-center text-zinc-500 text-sm">
+            No se encontraron socios en la base de datos.
+          </div>
+        ) : (
+          filteredMembers.map((m) => {
+            const planName = typeof m.plan === 'object' ? m.plan?.nombre : m.plan;
+            const displayPlan = PLAN_INFO[planName]?.label || planName || 'Sin Plan';
 
-      const status = getStatus(m.dueDate || m.fechaVencimiento);
-      const nombreSocio = m.nombre || m.name || 'Socio sin nombre';
-      const ultimoPago = m.lastPaymentDate || m.fechaUltimoPago || 'No registrado';
-      const fechaVenc = m.dueDate || m.fechaVencimiento || '-';
-      const cuota = m.customFee || m.monto || m.plan?.precio || 0;
-      const telefono = m.phone || m.telefono;
-      const notas = m.notes || m.notas;
+            const status = getStatus(m.dueDate);
+            const nombreSocio = m.name || 'Socio sin nombre';
+            const ultimoPago = m.lastPaymentDate || 'No registrado';
+            const fechaVenc = m.dueDate || '-';
+            const cuota = m.customFee || 0;
+            const telefono = m.phone;
+            const notas = m.notes;
 
-      return (
-        <div
-          key={m.id}
-          className="bg-[#181B1E] border border-zinc-800/80 hover:border-zinc-700 rounded-2xl p-4 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-        >
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-base text-white">{nombreSocio}</span>
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                  status === "active"
-                    ? "bg-emerald-950 text-emerald-400 border border-emerald-800/50"
-                    : status === "due_soon"
-                    ? "bg-amber-950 text-amber-400 border border-amber-800/50"
-                    : "bg-red-950 text-red-400 border border-red-800/50"
-                }`}
+            return (
+              <div
+                key={m.id}
+                className="bg-[#181B1E] border border-zinc-800/80 hover:border-zinc-700 rounded-2xl p-4 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
               >
-                {status === "active" ? "Al día" : status === "due_soon" ? "Por vencer" : "Vencido"}
-              </span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-base text-white">{nombreSocio}</span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                        status === "active"
+                          ? "bg-emerald-950 text-emerald-400 border border-emerald-800/50"
+                          : status === "due_soon"
+                          ? "bg-amber-950 text-amber-400 border border-amber-800/50"
+                          : "bg-red-950 text-red-400 border border-red-800/50"
+                      }`}
+                    >
+                      {status === "active" ? "Al día" : status === "due_soon" ? "Por vencer" : "Vencido"}
+                    </span>
 
-              {/* AHORA ES UN RENDER SEGURO DE STRING */}
-              <span className="text-xs text-zinc-400 bg-zinc-800/60 px-2 py-0.5 rounded-md">
-                {displayPlan}
-              </span>
-            </div>
+                    <span className="text-xs text-zinc-400 bg-zinc-800/60 px-2 py-0.5 rounded-md">
+                      {displayPlan}
+                    </span>
+                  </div>
 
-            <div className="text-xs text-zinc-400 flex flex-wrap gap-x-4 gap-y-1 pt-1">
-              <span>Último pago: {ultimoPago}</span>
-              <span className={status === "expired" ? "text-red-400 font-semibold" : ""}>
-                Vence: {fechaVenc}
-              </span>
-              <span>${Number(cuota).toLocaleString()}</span>
-              {telefono && <span className="text-zinc-500">📞 {telefono}</span>}
-            </div>
-            {notas && <p className="text-xs text-zinc-500 italic pt-0.5">{notas}</p>}
-          </div>
+                  <div className="text-xs text-zinc-400 flex flex-wrap gap-x-4 gap-y-1 pt-1">
+                    <span>Último pago: {ultimoPago}</span>
+                    <span className={status === "expired" ? "text-red-400 font-semibold" : ""}>
+                      Vence: {fechaVenc}
+                    </span>
+                    <span>${Number(cuota).toLocaleString()}</span>
+                    {telefono && <span className="text-zinc-500">📞 {telefono}</span>}
+                  </div>
+                  {notas && <p className="text-xs text-zinc-500 italic pt-0.5">{notas}</p>}
+                </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-center">
-            <button
-              onClick={() => handleDeleteMember(m.id)}
-              className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-xl transition-all"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-            <div className="flex items-center gap-2 self-end sm:self-center">
-  {/* NUEVO BOTÓN DE WHATSAPP */}
-  <button
-    onClick={() => handleSendWhatsApp(m)}
-    className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
-    title="Enviar recordatorio"
-  >
-    💬 Avisar
-  </button>
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  {/* BOTÓN REGISTRAR PAGO */}
+                  <button
+                    onClick={() => handleOpenPaymentModal(m)}
+                    className="bg-[#C6FF3D] hover:bg-[#b0f024] text-black font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" /> Cobrar
+                  </button>
 
-  {/* BOTÓN DE ELIMINAR QUE YA TENÍAS */}
-  <button
-    onClick={() => handleDeleteMember(m.id)}
-    className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-xl transition-all"
-  >
-    <Trash2 className="w-4 h-4" />
-  </button>
-</div>
-          </div>
-        </div>
-      );
-    })
-  )}
-</div>
+                  {/* BOTÓN WHATSAPP */}
+                  <button
+                    onClick={() => handleSendWhatsApp(m)}
+                    className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                    title="Enviar recordatorio"
+                  >
+                    💬 Avisar
+                  </button>
 
-      {/* Modal */}
+                  {/* BOTÓN ELIMINAR */}
+                  <button
+                    onClick={() => handleDeleteMember(m.id)}
+                    className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-xl transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Modal Nuevo Socio */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-[#181B1E] border border-zinc-800 rounded-2xl max-w-md w-full p-6 relative">
@@ -516,7 +569,79 @@ const handleDeleteMember = async (id) => {
           </div>
         </div>
       )}
+
+      {/* Modal de Cobro Rápido */}
+      {isPaymentModalOpen && payingMember && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#181B1E] border border-zinc-800 rounded-2xl max-w-md w-full p-6 relative">
+            <button
+              onClick={() => setIsPaymentModalOpen(false)}
+              className="absolute right-4 top-4 text-zinc-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h2 className="text-xl font-bold font-[Archivo_Black] text-white mb-1">
+              REGISTRAR PAGO
+            </h2>
+            <p className="text-xs text-zinc-400 mb-4">
+              Socio: <span className="text-white font-semibold">{payingMember.name}</span>
+            </p>
+
+            <form onSubmit={handleConfirmPayment} className="space-y-4">
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Método de Pago</label>
+                <select
+                  value={paymentData.metodoPago}
+                  onChange={(e) => setPaymentData({ ...paymentData, metodoPago: e.target.value })}
+                  className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
+                >
+                  <option value="EFECTIVO">Efectivo</option>
+                  <option value="TRANSFERENCIA">Transferencia</option>
+                  <option value="TARJETA">Tarjeta</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-zinc-400 block mb-1">Monto ($)</label>
+                  <input
+                    type="number"
+                    value={paymentData.monto}
+                    onChange={(e) => setPaymentData({ ...paymentData, monto: e.target.value })}
+                    className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-400 block mb-1">Meses a Renovar</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={paymentData.meses}
+                    onChange={(e) => setPaymentData({ ...paymentData, meses: e.target.value })}
+                    className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={processingPayment}
+                className="w-full bg-[#C6FF3D] hover:bg-[#b0f024] text-black font-bold py-2.5 rounded-xl transition-all text-sm mt-2 flex items-center justify-center gap-2"
+              >
+                {processingPayment ? (
+                  "Procesando..."
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" /> Confirmar y Renovar Cuota
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
