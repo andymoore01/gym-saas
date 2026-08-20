@@ -50,8 +50,16 @@ export default function PantallaRecepcion() {
 
       if (resPlanes.ok) {
         const dataPlanes = await resPlanes.json();
-        const listaPlanes = Array.isArray(dataPlanes) ? dataPlanes : (dataPlanes.planes || []);
-        setPlanes(listaPlanes);
+        // Garantizamos extraer el array sin importar la estructura en que venga
+        let lista = [];
+        if (Array.isArray(dataPlanes)) {
+          lista = dataPlanes;
+        } else if (dataPlanes && Array.isArray(dataPlanes.planes)) {
+          lista = dataPlanes.planes;
+        } else if (dataPlanes && Array.isArray(dataPlanes.data)) {
+          lista = dataPlanes.data;
+        }
+        setPlanes(lista);
       }
     } catch (error) {
       console.error('Error de red:', error);
@@ -65,7 +73,7 @@ export default function PantallaRecepcion() {
     cargarDatos();
   }, []);
 
-  // Crear un nuevo socio garantizando capturar el nombre y enviar las variaciones
+  // Crear nuevo socio enviando todas las variantes posibles de campos para evitar errores de validación
   const handleCrearSocio = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
@@ -77,7 +85,6 @@ export default function PantallaRecepcion() {
       return;
     }
 
-    // Enviamos todas las claves posibles para satisfacer cualquier requerimiento del backend
     const payload = {
       nombre: nombreTexto,
       nombreApellido: nombreTexto,
@@ -130,8 +137,9 @@ export default function PantallaRecepcion() {
   const totalActivos = socios.filter((s) => s.estado === 'ACTIVO').length;
   const totalVencidos = socios.filter((s) => s.estado === 'BAJA').length;
 
-  // Filtrar los 2 planes más caros
-  const planesMasCaros = [...planes]
+  // Filtrado seguro de los 2 planes de mayor precio
+  const listaSeguraPlanes = Array.isArray(planes) ? planes : [];
+  const planesMasCaros = [...listaSeguraPlanes]
     .sort((a, b) => {
       const precioA = Number(a.precio || a.monto || a.valor || 0);
       const precioB = Number(b.precio || b.monto || b.valor || 0);
@@ -315,18 +323,24 @@ export default function PantallaRecepcion() {
                   className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
                 >
                   <option value="">Seleccionar plan...</option>
-                  {planesMasCaros.length === 0 ? (
-                    <option disabled value="">No hay planes disponibles</option>
-                  ) : (
-                    planesMasCaros.map((plan) => {
-                      const precio = plan.precio || plan.monto || plan.valor;
-                      return (
-                        <option key={plan.id} value={plan.id}>
-                          {plan.nombre} {precio ? `- $${precio}` : ''}
-                        </option>
-                      );
-                    })
-                  )}
+                  {planesMasCaros.length > 0
+                    ? planesMasCaros.map((plan) => {
+                        const precio = plan.precio || plan.monto || plan.valor;
+                        return (
+                          <option key={plan.id} value={plan.id}>
+                            {plan.nombre} {precio ? `- $${precio}` : ''}
+                          </option>
+                        );
+                      })
+                    : listaSeguraPlanes.map((plan) => {
+                        const precio = plan.precio || plan.monto || plan.valor;
+                        return (
+                          <option key={plan.id} value={plan.id}>
+                            {plan.nombre} {precio ? `- $${precio}` : ''}
+                          </option>
+                        );
+                      })
+                  }
                 </select>
               </div>
 
