@@ -50,7 +50,7 @@ router.get('/gimnasios', async (req, res) => {
 // POST /api/superadmin/gimnasios - Crear gimnasio y su usuario administrador
 router.post('/gimnasios', async (req, res) => {
   try {
-    const { nombre, email, password, telefono } = req.body;
+    const { nombre, email, password } = req.body;
 
     if (!nombre || !email || !password) {
       return res.status(400).json({ error: "Nombre, email y contraseña son obligatorios" });
@@ -74,13 +74,13 @@ router.post('/gimnasios', async (req, res) => {
       return res.status(400).json({ error: "El email ya se encuentra registrado" });
     }
 
-    // 1. Crear el Gimnasio (sin el campo telefono que no existe en el schema)
+    // 1. Crear el Gimnasio con los campos exactos del esquema (activo en lugar de estado)
     const nuevoGym = await prisma.gimnasio.create({
       data: {
         nombre: nombreLimpio,
         slug: slugGenerado,
         email: emailLimpio,
-        estado: 'ACTIVO'
+        activo: true
       }
     });
 
