@@ -18,6 +18,7 @@ export default function PantallaRecepcion() {
     notas: ''
   });
 
+  // Cargar lista de socios y planes desde el backend
   const cargarDatos = async () => {
     setCargando(true);
     setMensajeError('');
@@ -35,30 +36,28 @@ export default function PantallaRecepcion() {
     };
 
     try {
-      const resSocios = await fetch(`${API_URL}/socios`, { headers });
-      
+      // Peticiones en paralelo
+      const [resSocios, resPlanes] = await Promise.all([
+        fetch(`${API_URL}/socios`, { headers }),
+        fetch(`${API_URL}/planes`, { headers })
+      ]);
+
       if (resSocios.ok) {
         const dataSocios = await resSocios.json();
         setSocios(Array.isArray(dataSocios) ? dataSocios : []);
       } else {
         const errJson = await resSocios.json().catch(() => ({}));
-        setMensajeError(`Error ${resSocios.status}: ${errJson.error || errJson.message || 'Respuesta no válida de la API'}`);
+        setMensajeError(`Error ${resSocios.status}: ${errJson.error || errJson.message || 'Error al obtener socios'}`);
       }
 
-      // Carga opcional de planes
-      try {
-        const resPlanes = await fetch(`${API_URL}/planes`, { headers });
-        if (resPlanes.ok) {
-          const dataPlanes = await resPlanes.json();
-          setPlanes(Array.isArray(dataPlanes) ? dataPlanes : []);
-        }
-      } catch (e) {
-        console.warn('Omitiendo planes:', e);
+      if (resPlanes.ok) {
+        const dataPlanes = await resPlanes.json();
+        const listaPlanes = Array.isArray(dataPlanes) ? dataPlanes : (dataPlanes.planes || []);
+        setPlanes(listaPlanes);
       }
-
     } catch (error) {
       console.error('Error de red:', error);
-      setMensajeError(`Error de red o CORS al conectar con Render: ${error.message}`);
+      setMensajeError(`Error de red o conexión: ${error.message}`);
     } finally {
       setCargando(false);
     }
@@ -68,9 +67,18 @@ export default function PantallaRecepcion() {
     cargarDatos();
   }, []);
 
+  // Crear un nuevo socio enviando nombre y nombreApellido para garantizar compatibilidad con el backend
   const handleCrearSocio = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
+
+    const payload = {
+      nombre: nuevoSocio.nombre.trim(),
+      nombreApellido: nuevoSocio.nombre.trim(),
+      telefono: nuevoSocio.telefono.trim(),
+      ...(nuevoSocio.planId && nuevoSocio.planId !== '' ? { planId: nuevoSocio.planId } : {}),
+      ...(nuevoSocio.notas ? { notas: nuevoSocio.notas.trim() } : {})
+    };
 
     try {
       const res = await fetch(`${API_URL}/socios`, {
@@ -79,7 +87,7 @@ export default function PantallaRecepcion() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(nuevoSocio)
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
@@ -87,8 +95,8 @@ export default function PantallaRecepcion() {
         setNuevoSocio({ nombre: '', telefono: '', planId: '', notas: '' });
         cargarDatos();
       } else {
-        const errData = await res.json();
-        alert(errData.error || 'Error al guardar el socio');
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || errData.message || 'Error al guardar el socio');
       }
     } catch (error) {
       console.error('Error al crear socio:', error);
@@ -145,7 +153,7 @@ export default function PantallaRecepcion() {
         </div>
       </div>
 
-      {/* ALERTA CON DETALLE DE ERROR */}
+      {/* BANNER DE ERROR */}
       {mensajeError && (
         <div className="max-w-7xl mx-auto mb-6 bg-red-950/40 border border-red-800 text-red-300 text-xs p-3.5 rounded-xl flex items-center justify-between gap-4">
           <span>⚠️ <strong>Detalle del error:</strong> {mensajeError}</span>
@@ -207,7 +215,7 @@ export default function PantallaRecepcion() {
         </div>
       </div>
 
-      {/* TABLA O LISTADO DE SOCIOS */}
+      {/* TABLA DE SOCIOS */}
       <div className="max-w-7xl mx-auto bg-[#181B1E] border border-zinc-800 rounded-2xl p-4 min-h-[300px]">
         {cargando ? (
           <div className="flex items-center justify-center py-20 text-zinc-500 text-sm">
@@ -215,7 +223,7 @@ export default function PantallaRecepcion() {
           </div>
         ) : sociosFiltrados.length === 0 ? (
           <div className="flex items-center justify-center py-20 text-zinc-500 text-sm">
-            No se encontraron socios en la base de datos.
+            No se encontraron socios registrados.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -268,6 +276,7 @@ export default function PantallaRecepcion() {
                   value={nuevoSocio.nombre}
                   onChange={(e) => setNuevoSocio({ ...nuevoSocio, nombre: e.target.value })}
                   className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
+                  placeholder="Ej. Andy Moore"
                 />
               </div>
 
@@ -278,6 +287,7 @@ export default function PantallaRecepcion() {
                   value={nuevoSocio.telefono}
                   onChange={(e) => setNuevoSocio({ ...nuevoSocio, telefono: e.target.value })}
                   className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
+                  placeholder="Ej. 2914796038"
                 />
               </div>
 
@@ -289,11 +299,18 @@ export default function PantallaRecepcion() {
                   className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
                 >
                   <option value="">Seleccionar plan...</option>
-                  {planes.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.nombre}
-                    </option>
-                  ))}
+                  {planes.length === 0 ? (
+                    <option disabled value="">No hay planes disponibles en DB</option>
+                  ) : (
+                    planes.map((plan) => {
+                      const precio = plan.precio || plan.monto || plan.valor;
+                      return (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.nombre} {precio ? `- $${precio}` : ''}
+                        </option>
+                      );
+                    })
+                  )}
                 </select>
               </div>
 
