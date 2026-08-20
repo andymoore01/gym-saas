@@ -3,7 +3,6 @@ import prisma from '../lib/prisma.js';
 
 const router = express.Router();
 
-// GET /api/planes
 router.get('/', async (req, res) => {
   try {
     const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1;
@@ -27,13 +26,12 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/planes
 router.post('/', async (req, res) => {
   try {
     const { nombre, precio } = req.body;
 
-    if (!nombre || precio === undefined || isNaN(Number(precio))) {
-      return res.status(400).json({ error: 'El nombre y un precio numérico son obligatorios' });
+    if (!nombre || precio === undefined) {
+      return res.status(400).json({ error: 'El nombre y precio son obligatorios' });
     }
 
     const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1;
@@ -41,7 +39,7 @@ router.post('/', async (req, res) => {
 
     let nuevoPlan;
 
-    // Intento 1: Inserción directa por ID
+    // Variante 1: Inserción directa básica
     try {
       nuevoPlan = await prisma.plan.create({
         data: {
@@ -50,43 +48,47 @@ router.post('/', async (req, res) => {
           gimnasioId: parsedGimnasioId
         }
       });
-    } catch (errPrimario) {
-      // Intento 2: Inserción mediante relación "connect" de Prisma
-      nuevoPlan = await prisma.plan.create({
-        data: {
-          nombre: String(nombre).trim(),
-          precio: Number(precio),
-          gimnasio: {
-            connect: { id: parsedGimnasioId }
+    } catch (err1) {
+      // Variante 2: Incluyendo duracionMeses por si el schema lo exige
+      try {
+        nuevoPlan = await prisma.plan.create({
+          data: {
+            nombre: String(nombre).trim(),
+            precio: Number(precio),
+            duracionMeses: 1,
+            gimnasioId: parsedGimnasioId
           }
-        }
-      });
+        });
+      } catch (err2) {
+        // Variante 3: Mediante relacion connect
+        nuevoPlan = await prisma.plan.create({
+          data: {
+            nombre: String(nombre).trim(),
+            precio: Number(precio),
+            gimnasio: { connect: { id: parsedGimnasioId } }
+          }
+        });
+      }
     }
 
     return res.status(201).json(nuevoPlan);
   } catch (error) {
-    console.error('Error crítico al crear plan:', error);
+    console.error('Error detallado de Prisma:', error);
     return res.status(500).json({ 
-      error: 'Error interno al crear el plan', 
-      detalle: error.message 
+      error: error.message || 'Error al escribir en la base de datos' 
     });
   }
 });
 
-// DELETE /api/planes/:id
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const parsedId = !isNaN(Number(id)) ? Number(id) : String(id);
 
-    await prisma.plan.delete({
-      where: { id: parsedId }
-    });
-
-    return res.json({ mensaje: 'Plan eliminado correctamente' });
+    await prisma.plan.delete({ where: { id: parsedId } });
+    return res.json({ mensaje: 'Plan eliminado' });
   } catch (error) {
-    console.error('Error al eliminar plan:', error);
-    return res.status(500).json({ error: 'Error al eliminar el plan' });
+    return res.status(500).json({ error: error.message });
   }
 });
 
