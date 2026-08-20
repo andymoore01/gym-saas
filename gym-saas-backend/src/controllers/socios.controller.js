@@ -1,130 +1,156 @@
-import prisma from '../lib/prisma.js';
+import { PrismaClient } from '@prisma/client';
 
-export const createSocio = async (req, res) => {
-  try {
-    const { nombre, name, telefono, phone, notas, notes, gimnasioId, planId, planName } = req.body;
+const prisma = new PrismaClient();
 
-    const nombreSocio = nombre || name;
-    if (!nombreSocio) {
-      return res.status(400).json({ error: 'El nombre del socio es obligatorio' });
-    }
-
-    // 1. Resolver el gimnasio (usa el que viene del request o toma el primero disponible)
-    let targetGimnasioId = gimnasioId || (req.auth && req.auth.gimnasioId);
-
-    if (!targetGimnasioId) {
-      let gym = await prisma.gimnasio.findFirst();
-      if (!gym) {
-        gym = await prisma.gimnasio.create({
-          data: {
-            nombre: 'Mi Gimnasio Principal',
-            slug: 'gym-principal',
-            email: 'admin@gimnasio.com',
-          },
-        });
-      }
-      targetGimnasioId = gym.id;
-    }
-
-    // 2. Resolver el Plan (busca un plan existente para ese gym o crea uno por defecto)
-    let targetPlanId = planId;
-
-    if (!targetPlanId) {
-      let planExistente = await prisma.plan.findFirst({
-        where: { gimnasioId: targetGimnasioId },
-      });
-
-      if (!planExistente) {
-        planExistente = await prisma.plan.create({
-          data: {
-            nombre: planName || 'Libre',
-            precio: 55000,
-            gimnasioId: targetGimnasioId,
-          },
-        });
-      }
-      targetPlanId = planExistente.id;
-    }
-
-    // Obtener solo los socios DEL gimnasio autenticado
+// Obtener todos los socios del gimnasio autenticado
 export const getSocios = async (req, res) => {
   try {
-    const { gimnasioId } = req.user;
+    const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
 
     const socios = await prisma.socio.findMany({
-      where: { gimnasioId },
-      include: { plan: true }
+      where: {
+        gimnasioId: gimnasioId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
 
-    res.json(socios);
+    return res.status(200).json(socios);
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener los socios" });
+    console.error('Error al obtener socios:', error);
+    return res.status(500).json({
+      error: 'Error al obtener la lista de socios',
+      detalle: error.message,
+    });
   }
 };
 
-// Crear socio asociándolo al gimnasio del token
-export const createSocio = async (req, res) => {
+// Obtener un socio por ID
+export const getSocioById = async (req, res) => {
   try {
-    const { gimnasioId } = req.user;
-    const { nombre, telefono, planId, monto, notas } = req.body;
+    const { id } = req.params;
+    const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
+
+    const socio = await prisma.socio.findFirst({
+      where: {
+        id: id,
+        gimnasioId: gimnasioId,
+      },
+    });
+
+    if (!socio) {
+      return res.status(404).json({ error: 'Socio no encontrado' });
+    }
+
+    return res.status(200).json(socio);
+  } catch (error) {
+    console.error('Error al obtener socio:', error);
+    return res.status(500).json({
+      error: 'Error al buscar el socio',
+      detalle: error.message,
+    });
+  }
+};
+
+// Crear un nuevo socio
+export const crearSocio = async (req, res) => {
+  try {
+    const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
+    const { nombre, apellido, dni, email, telefono } = req.body;
+
+    if (!nombre || !apellido) {
+      return res.status(400).json({ error: 'Nombre y apellido son requeridos' });
+    }
 
     const nuevoSocio = await prisma.socio.create({
       data: {
         nombre,
+        apellido,
+        dni,
+        email,
         telefono,
-        planId,
-        monto,
-        notas,
-        gimnasioId // Asignación automática al tenant
-      }
-    });
-
-    res.status(201).json(nuevoSocio);
-  } catch (error) {
-    res.status(500).json({ error: "Error al crear socio" });
-  }
-};
-
-    // 3. Crear el socio con el esquema exacto de Prisma
-    const nuevoSocio = await prisma.socio.create({
-      data: {
-        nombre: nombreSocio,
-        telefono: String(telefono || phone || ''),
-        notas: notas || notes || '',
-        gimnasioId: targetGimnasioId,
-        planId: targetPlanId,
-      },
-      include: {
-        plan: true,
+        gimnasioId: gimnasioId,
       },
     });
 
-    return res.status(201).json(nuevoSocio);
-  } catch (error) {
-    console.error('Error al crear socio en Prisma:', error);
-    return res.status(500).json({ error: error.message || 'Error al guardar el socio' });
-  }
-};
-
-export const getSocios = async (req, res) => {
-  try {
-    const socios = await prisma.socio.findMany({
-      include: { plan: true, pagos: true },
+    return res.status(201).json({
+      mensaje: 'Socio creado exitosamente',
+      socio: nuevoSocio,
     });
-    return res.json(socios);
   } catch (error) {
-    console.error('Error al obtener socios:', error);
-    return res.status(500).json({ error: 'Error al obtener los socios' });
+    console.error('Error al crear socio:', error);
+    return res.status(500).json({
+      error: 'Error interno al registrar el socio',
+      detalle: error.message,
+    });
   }
 };
 
-export const deleteSocio = async (req, res) => {
+// Actualizar un socio
+export const actualizarSocio = async (req, res) => {
   try {
     const { id } = req.params;
-    await prisma.socio.delete({ where: { id } });
-    return res.json({ ok: true, message: 'Socio eliminado' });
+    const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
+    const { nombre, apellido, dni, email, telefono, activo } = req.body;
+
+    const socioExistente = await prisma.socio.findFirst({
+      where: { id, gimnasioId },
+    });
+
+    if (!socioExistente) {
+      return res.status(404).json({ error: 'Socio no encontrado' });
+    }
+
+    const socioActualizado = await prisma.socio.update({
+      where: { id },
+      data: {
+        nombre,
+        apellido,
+        dni,
+        email,
+        telefono,
+        activo,
+      },
+    });
+
+    return res.status(200).json({
+      mensaje: 'Socio actualizado correctamente',
+      socio: socioActualizado,
+    });
+  } catch (error) {
+    console.error('Error al actualizar socio:', error);
+    return res.status(500).json({
+      error: 'Error al actualizar el socio',
+      detalle: error.message,
+    });
+  }
+};
+
+// Eliminar o desactivar un socio
+export const eliminarSocio = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
+
+    const socioExistente = await prisma.socio.findFirst({
+      where: { id, gimnasioId },
+    });
+
+    if (!socioExistente) {
+      return res.status(404).json({ error: 'Socio no encontrado' });
+    }
+
+    await prisma.socio.delete({
+      where: { id },
+    });
+
+    return res.status(200).json({ mensaje: 'Socio eliminado con éxito' });
   } catch (error) {
     console.error('Error al eliminar socio:', error);
-    return res.status(500).json({ error: 'Error al eliminar socio' });
+    return res.status(500).json({
+      error: 'Error al eliminar el socio',
+      detalle: error.message,
+    });
   }
 };
