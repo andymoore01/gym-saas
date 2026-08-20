@@ -12,7 +12,10 @@ export const getSocios = async (req, res) => {
         gimnasioId: gimnasioId,
       },
       orderBy: {
-        createdAt: 'desc',
+        joinedDate: "desc" // Ordenar por fecha de ingreso descendente  
+        },
+        include: {
+          plan: true
       },
     });
 
