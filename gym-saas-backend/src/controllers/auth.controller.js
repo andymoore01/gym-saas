@@ -12,32 +12,27 @@ export const login = async (req, res) => {
 
     const emailLimpio = email.trim().toLowerCase();
 
-    // 1. Buscar usuario
     const usuario = await prisma.usuario.findUnique({
       where: { email: emailLimpio }
     });
 
     if (!usuario) {
-      return res.status(401).json({ error: "Usuario o credenciales inválidas" });
+      return res.status(401).json({ error: `Usuario no encontrado en la BD para: ${emailLimpio}` });
     }
 
-    // 2. CAMBIO CLAVE: Buscamos tanto passwordHash (como está en tu DB) como password por si acaso
     const hashGuardado = usuario.passwordHash || usuario.password;
     if (!hashGuardado) {
-      return res.status(401).json({ error: "El usuario no tiene una contraseña configurada" });
+      return res.status(401).json({ error: "El usuario no tiene contraseña registrada" });
     }
 
-    // 3. Comparar la contraseña escrita con el hash de la base de datos
     const passwordValido = await bcrypt.compare(password, hashGuardado);
     if (!passwordValido) {
-      return res.status(401).json({ error: "Usuario o credenciales inválidas" });
+      return res.status(401).json({ error: "Contraseña incorrecta" });
     }
 
-    // 4. Definir rol (Si es tu mail, le asigna SUPERADMIN de forma automática)
     const esAdminDev = emailLimpio === 'andysoydelchivo@gmail.com';
     const rolFinal = esAdminDev ? 'SUPERADMIN' : (usuario.rol || 'ADMIN');
 
-    // 5. Generar Token JWT
     const token = jwt.sign(
       {
         id: usuario.id,
@@ -60,7 +55,12 @@ export const login = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Error crítico en login:", error);
-    return res.status(500).json({ error: "Error interno al iniciar sesión", detalle: error.message });
+    // ESTO VA A MOSTRAR EL ERROR REAL EN LA PANTALLA EN VEZ DE "Error interno"
+    console.error("ERROR DETALLADO LOGIN:", error);
+    return res.status(500).json({ 
+      error: "FALLÓ EL LOGIN", 
+      detalle: error.message,
+      stack: error.stack 
+    });
   }
 };
