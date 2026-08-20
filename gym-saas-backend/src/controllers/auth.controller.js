@@ -1,4 +1,3 @@
-
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -13,7 +12,13 @@ export const registrarGimnasio = async (req, res) => {
       return res.status(400).json({ error: 'Todos los campos son obligatorios' });
     }
 
-    // 1. Verificar si el email ya existe
+    // Generamos el slug reemplazando espacios y caracteres especiales
+    const slugGenerated = nombreFinal
+      .toLowerCase()
+      .trim()
+      .replace(/[\s_]+/g, '-')
+      .replace(/[^\w\-]+/g, '');
+
     const existe = await prisma.gimnasio.findUnique({
       where: { email }
     });
@@ -22,13 +27,12 @@ export const registrarGimnasio = async (req, res) => {
       return res.status(400).json({ error: 'El email ya está registrado' });
     }
 
-    // 2. Hash de contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 3. Crear gimnasio (con activo: true por defecto)
     const nuevoGimnasio = await prisma.gimnasio.create({
       data: {
         nombre: nombreFinal,
+        slug: slugGenerated, // 👈 Pasamos el slug obligatorio
         email,
         password: hashedPassword,
         activo: true
@@ -40,7 +44,8 @@ export const registrarGimnasio = async (req, res) => {
       gimnasio: {
         id: nuevoGimnasio.id,
         nombre: nuevoGimnasio.nombre,
-        email: nuevoGimnasio.email
+        email: nuevoGimnasio.email,
+        slug: nuevoGimnasio.slug
       }
     });
 
