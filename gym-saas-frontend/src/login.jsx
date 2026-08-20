@@ -18,19 +18,18 @@ export default function Login({ onLoginSuccess }) {
 
       const data = await response.json();
 
-      if (response.ok) {
-        // 1. Guardar token y datos de sesión
+      if (response.ok && data.token) {
+        // 1. Guardar en localStorage
         localStorage.setItem('token', data.token);
         if (data.usuario) {
           localStorage.setItem('usuario', JSON.stringify(data.usuario));
           localStorage.setItem('gimnasioId', data.usuario.gimnasioId);
         }
 
-        // 2. Notificar al componente padre o recargar
+        // 2. Notificar al padre pasándole el token en mano
         if (onLoginSuccess) {
-          onLoginSuccess(data);
+          onLoginSuccess(data.token);
         } else {
-          // Si no recibís el prop onLoginSuccess, forzás la recarga para que el Router/App renderice el Dashboard
           window.location.reload();
         }
       } else {
