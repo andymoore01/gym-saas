@@ -12,7 +12,7 @@ import {
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap');`;
 const API_URL = "http://localhost:3000/api/socios";
-
+const API_URL = import.meta.env.VITE_API_URL || 'https://gym-saas-backend-vwm9.onrender.com';
 const PLAN_INFO = {
   "3dias": { label: "3 días", defaultFee: 12000 },
   libre: { label: "Libre", defaultFee: 18000 },

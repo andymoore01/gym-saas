@@ -9,11 +9,24 @@ import suscripcionRoutes from './routes/suscripcion.routes.js';
 
 const app = express();
 
-// Permitir peticiones desde el frontend en Vite
+// Permitir peticiones tanto locales como desde Vercel
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://gym-saas-omega.vercel.app'
+];
+
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Permitir peticiones sin origen (como Postman o curl) o si están en la lista permitida
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Bloqueado por CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
 app.use(express.json());
