@@ -6,7 +6,7 @@ export default function SuperAdmin({ onVolver }) {
   const [gimnasios, setGimnasios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [modalNuevo, setModalNuevo] = useState(false);
-  const [nuevoGym, setNuevoGym] = useState({ nombre: '', email: '', telefono: '' });
+  const [nuevoGym, setNuevoGym] = useState({ nombre: '', email: '', password: '', telefono: '' });
 
   const cargarGimnasios = async () => {
     setCargando(true);
@@ -44,15 +44,17 @@ export default function SuperAdmin({ onVolver }) {
         body: JSON.stringify(nuevoGym)
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
         setModalNuevo(false);
-        setNuevoGym({ nombre: '', email: '', telefono: '' });
+        setNuevoGym({ nombre: '', email: '', password: '', telefono: '' });
         cargarGimnasios();
       } else {
-        alert("Error al registrar cliente.");
+        alert(`Error al registrar cliente: ${data.error || data.detalle || 'Consulte al administrador'}`);
       }
     } catch (err) {
-      alert("Error de conexión.");
+      alert("Error de conexión al guardar gimnasio.");
     }
   };
 
@@ -95,13 +97,13 @@ export default function SuperAdmin({ onVolver }) {
         <div className="flex gap-3">
           <button
             onClick={() => setModalNuevo(true)}
-            className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-lg"
+            className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-lg cursor-pointer"
           >
             + Nuevo Gimnasio
           </button>
           <button
             onClick={onVolver}
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold px-4 py-2 rounded-xl text-xs transition-all"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold px-4 py-2 rounded-xl text-xs transition-all cursor-pointer"
           >
             Ir a App
           </button>
@@ -164,7 +166,7 @@ export default function SuperAdmin({ onVolver }) {
                   <td className="py-3 px-2 text-center">
                     <button
                       onClick={() => toggleEstado(gym)}
-                      className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                      className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                         gym.estado === 'SUSPENDIDO'
                           ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                           : 'bg-red-600/80 hover:bg-red-600 text-white'
@@ -183,7 +185,7 @@ export default function SuperAdmin({ onVolver }) {
       {/* MODAL CREAR CLIENTE */}
       {modalNuevo && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#121417] border border-zinc-800 rounded-2xl p-6 max-w-md w-full space-y-4">
+          <div className="bg-[#121417] border border-zinc-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
             <h3 className="text-base font-black text-white uppercase">Registrar Nuevo Gimnasio</h3>
             <form onSubmit={handleCrearGimnasio} className="space-y-3">
               <div>
@@ -198,7 +200,7 @@ export default function SuperAdmin({ onVolver }) {
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 block mb-1">Email de Contacto</label>
+                <label className="text-xs text-zinc-400 block mb-1">Email de Contacto (Usuario)</label>
                 <input
                   type="email"
                   required
@@ -206,6 +208,17 @@ export default function SuperAdmin({ onVolver }) {
                   onChange={(e) => setNuevoGym({ ...nuevoGym, email: e.target.value })}
                   className="w-full bg-[#090A0C] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
                   placeholder="admin@titanium.com"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Contraseña Inicial</label>
+                <input
+                  type="password"
+                  required
+                  value={nuevoGym.password}
+                  onChange={(e) => setNuevoGym({ ...nuevoGym, password: e.target.value })}
+                  className="w-full bg-[#090A0C] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                  placeholder="••••••••"
                 />
               </div>
               <div>
@@ -223,13 +236,13 @@ export default function SuperAdmin({ onVolver }) {
                 <button
                   type="button"
                   onClick={() => setModalNuevo(false)}
-                  className="flex-1 bg-zinc-800 text-zinc-300 font-bold py-2 rounded-xl text-xs hover:bg-zinc-700"
+                  className="flex-1 bg-zinc-800 text-zinc-300 font-bold py-2 rounded-xl text-xs hover:bg-zinc-700 transition-all cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-purple-600 text-white font-bold py-2 rounded-xl text-xs hover:bg-purple-500"
+                  className="flex-1 bg-purple-600 text-white font-bold py-2 rounded-xl text-xs hover:bg-purple-500 transition-all cursor-pointer"
                 >
                   Crear Gimnasio
                 </button>
