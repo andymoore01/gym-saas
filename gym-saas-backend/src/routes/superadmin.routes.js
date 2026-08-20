@@ -1,9 +1,10 @@
 import express from 'express';
+import bcrypt from 'bcrypt';
 import prisma from '../lib/prisma.js';
 
 const router = express.Router();
 
-// GET /api/superadmin/gimnasios - Listar todos los clientes
+// GET /api/superadmin/gimnasios - Listar todos los gimnasios/clientes
 router.get('/gimnasios', async (req, res) => {
   try {
     const gimnasios = await prisma.gimnasio.findMany({
@@ -22,19 +23,23 @@ router.get('/gimnasios', async (req, res) => {
   }
 });
 
-// POST /api/superadmin/gimnasios - Crear un cliente nuevo
+// POST /api/superadmin/gimnasios - Crear cliente nuevo con contraseña
 router.post('/gimnasios', async (req, res) => {
   try {
-    const { nombre, email, telefono, estado } = req.body;
+    const { nombre, email, password, telefono, estado } = req.body;
 
-    if (!nombre || !email) {
-      return res.status(400).json({ error: "Nombre y email son obligatorios" });
+    if (!nombre || !email || !password) {
+      return res.status(400).json({ error: "Nombre, email y contraseña son obligatorios" });
     }
+
+    // Hash de la contraseña
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const nuevoGym = await prisma.gimnasio.create({
       data: {
         nombre: nombre.trim(),
         email: email.trim().toLowerCase(),
+        password: hashedPassword,
         telefono: telefono ? telefono.trim() : null,
         estado: estado || 'ACTIVO'
       }
