@@ -12,13 +12,14 @@ export const registrarGimnasio = async (req, res) => {
       return res.status(400).json({ error: 'Todos los campos son obligatorios' });
     }
 
-    // Generamos el slug reemplazando espacios y caracteres especiales
+    // 1. Generar el slug a partir del nombre
     const slugGenerated = nombreFinal
       .toLowerCase()
       .trim()
       .replace(/[\s_]+/g, '-')
       .replace(/[^\w\-]+/g, '');
 
+    // 2. Validar si existe el email
     const existe = await prisma.gimnasio.findUnique({
       where: { email }
     });
@@ -27,12 +28,14 @@ export const registrarGimnasio = async (req, res) => {
       return res.status(400).json({ error: 'El email ya está registrado' });
     }
 
+    // 3. Hashear la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // 4. Crear el gimnasio pasándole el 'slug' (Línea 18 corregida)
     const nuevoGimnasio = await prisma.gimnasio.create({
       data: {
         nombre: nombreFinal,
-        slug: slugGenerated, // 👈 Pasamos el slug obligatorio
+        slug: slugGenerated, // 👈 OBLIGATORIO: solución al error de Prisma
         email,
         password: hashedPassword,
         activo: true
@@ -41,18 +44,13 @@ export const registrarGimnasio = async (req, res) => {
 
     return res.status(201).json({
       mensaje: 'Gimnasio creado con éxito',
-      gimnasio: {
-        id: nuevoGimnasio.id,
-        nombre: nuevoGimnasio.nombre,
-        email: nuevoGimnasio.email,
-        slug: nuevoGimnasio.slug
-      }
+      gimnasio: nuevoGimnasio
     });
 
   } catch (error) {
-    console.error('Error detallado en registro:', error);
+    console.error('Error al registrar gimnasio:', error);
     return res.status(500).json({ 
-      error: 'Error interno al registrar el gimnasio',
+      error: 'Error interno en el servidor',
       detalle: error.message 
     });
   }
