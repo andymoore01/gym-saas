@@ -8,7 +8,11 @@ import './style.css';
 
 function App() {
   const [token, setToken] = useState<string | null>(null);
-  const path = window.location.pathname; // Leemos la URL del navegador
+
+  // Leemos la ruta normal o los parametros ?vista=admin / ?admin=true
+  const path = window.location.pathname;
+  const searchParams = new URLSearchParams(window.location.search);
+  const esSuperAdmin = path === '/superadmin' || path === '/admin' || searchParams.get('vista') === 'admin';
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -17,17 +21,17 @@ function App() {
     }
   }, []);
 
-  // 1. SI LA URL ES "/superadmin" O "/admin", MOSTRAR LA PÁGINA INDEPENDIENTE DE SUPERADMIN
-  if (path === '/superadmin' || path === '/admin') {
+  // 1. VISTA SUPERADMIN (si entra por /superadmin o por /?vista=admin)
+  if (esSuperAdmin) {
     return <SuperAdmin onVolver={() => (window.location.href = '/')} />;
   }
 
-  // 2. SI HAY SESIÓN Y ESTÁ EN LA RAÍZ "/", MOSTRAR LA APP DE GIMNASIO
+  // 2. APP GIMNASIO (con sesión iniciada)
   if (token) {
     return <PantallaRecepcion />;
   }
 
-  // 3. SI VIENE DE LOGIN O QUIERE INICIAR SESIÓN
+  // 3. LOGIN
   if (path === '/login') {
     return (
       <Login
