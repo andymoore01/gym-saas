@@ -59,7 +59,7 @@ router.post('/gimnasios', async (req, res) => {
     const emailLimpio = email.trim().toLowerCase();
     const nombreLimpio = nombre.trim();
 
-    // Generar el slug automáticamente (ej: "Hulk Gym" -> "hulk-gym")
+    // Generar el slug automáticamente
     const slugGenerado = nombreLimpio
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -74,13 +74,12 @@ router.post('/gimnasios', async (req, res) => {
       return res.status(400).json({ error: "El email ya se encuentra registrado" });
     }
 
-    // 1. Crear el Gimnasio (incluyendo el slug obligatorio)
+    // 1. Crear el Gimnasio (sin el campo telefono que no existe en el schema)
     const nuevoGym = await prisma.gimnasio.create({
       data: {
         nombre: nombreLimpio,
         slug: slugGenerado,
         email: emailLimpio,
-        telefono: telefono ? telefono.trim() : null,
         estado: 'ACTIVO'
       }
     });
