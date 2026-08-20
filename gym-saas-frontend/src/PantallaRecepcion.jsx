@@ -14,8 +14,7 @@ export default function PantallaRecepcion() {
   const [nuevoSocio, setNuevoSocio] = useState({
     nombre: '',
     telefono: '',
-    planId: '',
-    notas: ''
+    planId: ''
   });
 
   // Cargar lista de socios y planes desde el backend
@@ -36,7 +35,6 @@ export default function PantallaRecepcion() {
     };
 
     try {
-      // Peticiones en paralelo
       const [resSocios, resPlanes] = await Promise.all([
         fetch(`${API_URL}/socios`, { headers }),
         fetch(`${API_URL}/planes`, { headers })
@@ -67,47 +65,51 @@ export default function PantallaRecepcion() {
     cargarDatos();
   }, []);
 
-  // Crear un nuevo socio enviando nombre y nombreApellido para garantizar compatibilidad con el backend
-  // Guardar nuevo socio adaptado a cualquier validación de backend
-  export const crearSocio = async (req, res) => {
-  try {
-    // 1. Extraer cualquier posible variación del nombre que envíe el frontend
-    const nombreRecibido = req.body.nombre || req.body.nombreApellido || req.body.nombreCompleto;
-    const { telefono, planId, notas } = req.body;
+  // Crear un nuevo socio garantizando capturar el nombre y enviar las variaciones
+  const handleCrearSocio = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
 
-    // 2. Validar que realmente exista el nombre
-    if (!nombreRecibido || !nombreRecibido.trim()) {
-      return res.status(400).json({ error: 'Nombre y apellido son requeridos' });
+    const nombreTexto = nuevoSocio.nombre?.trim();
+
+    if (!nombreTexto) {
+      alert('El nombre es obligatorio.');
+      return;
     }
 
-    // 3. Obtener el gimnasioId desde req.auth (o req.usuario según tu middleware)
-    const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
+    // Enviamos todas las claves posibles para satisfacer cualquier requerimiento del backend
+    const payload = {
+      nombre: nombreTexto,
+      nombreApellido: nombreTexto,
+      nombreCompleto: nombreTexto,
+      telefono: nuevoSocio.telefono ? nuevoSocio.telefono.trim() : '',
+      ...(nuevoSocio.planId ? { planId: nuevoSocio.planId } : {})
+    };
 
-    if (!gimnasioId) {
-      return res.status(400).json({ error: 'No se pudo identificar el gimnasio del usuario.' });
-    }
+    try {
+      const res = await fetch(`${API_URL}/socios`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
 
-    // 4. Crear el registro en Prisma
-    const nuevoSocio = await prisma.socio.create({
-      data: {
-        nombre: nombreRecibido.trim(),
-        telefono: telefono ? telefono.trim() : null,
-        notas: notas ? notas.trim() : null,
-        gimnasioId: gimnasioId,
-        ...(planId ? { planId } : {})
-      },
-      include: {
-        plan: true
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        setModalAbierto(false);
+        setNuevoSocio({ nombre: '', telefono: '', planId: '' });
+        cargarDatos();
+      } else {
+        alert(data.error || data.message || 'Error al guardar el socio');
       }
-    });
-
-    return res.status(201).json(nuevoSocio);
-
-  } catch (error) {
-    console.error('Error al crear socio:', error);
-    return res.status(500).json({ error: 'Error interno al registrar el socio' });
-  }
-};
+    } catch (error) {
+      console.error('Error al crear socio:', error);
+      alert('Error de conexión con el servidor.');
+    }
+  };
 
   const handleLogout = () => {
     localStorage.clear();
@@ -127,6 +129,15 @@ export default function PantallaRecepcion() {
 
   const totalActivos = socios.filter((s) => s.estado === 'ACTIVO').length;
   const totalVencidos = socios.filter((s) => s.estado === 'BAJA').length;
+
+  // Filtrar los 2 planes más caros
+  const planesMasCaros = [...planes]
+    .sort((a, b) => {
+      const precioA = Number(a.precio || a.monto || a.valor || 0);
+      const precioB = Number(b.precio || b.monto || b.valor || 0);
+      return precioB - precioA;
+    })
+    .slice(0, 2);
 
   return (
     <div className="min-h-screen bg-[#111315] text-white p-4 md:p-8 font-sans">
@@ -304,10 +315,10 @@ export default function PantallaRecepcion() {
                   className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
                 >
                   <option value="">Seleccionar plan...</option>
-                  {planes.length === 0 ? (
-                    <option disabled value="">No hay planes disponibles en DB</option>
+                  {planesMasCaros.length === 0 ? (
+                    <option disabled value="">No hay planes disponibles</option>
                   ) : (
-                    planes.map((plan) => {
+                    planesMasCaros.map((plan) => {
                       const precio = plan.precio || plan.monto || plan.valor;
                       return (
                         <option key={plan.id} value={plan.id}>
