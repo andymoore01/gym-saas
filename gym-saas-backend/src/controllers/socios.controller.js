@@ -67,14 +67,12 @@ export const getSocioById = async (req, res) => {
 export const crearSocio = async (req, res) => {
   try {
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
-    // 1. Extraemos 'dni' del req.body
     const { nombre, apellido, dni, telefono, notas, planId } = req.body;
 
     if (!gimnasioId) {
       return res.status(400).json({ error: 'El gimnasioId es requerido' });
     }
 
-    // Concatenar nombre y apellido si vinieron separados
     let nombreCompleto = nombre ? nombre.trim() : '';
     if (apellido && apellido !== '-') {
       nombreCompleto = `${nombreCompleto} ${apellido.trim()}`.trim();
@@ -86,7 +84,6 @@ export const crearSocio = async (req, res) => {
 
     let targetPlanId = planId;
 
-    // Como planId es NOT NULL en Prisma, si no se envió uno, buscamos el primer plan del gimnasio
     if (!targetPlanId) {
       const primerPlan = await prisma.plan.findFirst({
         where: { gimnasioId }
@@ -100,11 +97,10 @@ export const crearSocio = async (req, res) => {
       targetPlanId = primerPlan.id;
     }
 
-    // 2. Pasamos el dni a Prisma
     const nuevoSocio = await prisma.socio.create({
       data: {
         nombre: nombreCompleto,
-        dni: dni ? String(dni).trim() : null, // Guarda el DNI si viene en la petición
+        dni: dni ? String(dni).trim() : null,
         telefono: telefono ? String(telefono).trim() : null,
         notas: notas || null,
         gimnasioId: gimnasioId,
@@ -128,12 +124,12 @@ export const crearSocio = async (req, res) => {
   }
 };
 
-// Actualizar un socio
+// Actualizar un socio (CORREGIDO: Incluye DNI)
 export const actualizarSocio = async (req, res) => {
   try {
     const { id } = req.params;
     const gimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
-    const { nombre, telefono, notas, estado, planId } = req.body;
+    const { nombre, dni, telefono, notas, estado, planId } = req.body; // 👈 Agregado 'dni'
 
     const socioExistente = await prisma.socio.findFirst({
       where: { id, gimnasioId },
@@ -147,6 +143,7 @@ export const actualizarSocio = async (req, res) => {
       where: { id },
       data: {
         ...(nombre ? { nombre: nombre.trim() } : {}),
+        ...(dni !== undefined ? { dni: dni ? String(dni).trim() : null } : {}), // 👈 Guarda el DNI
         ...(telefono !== undefined ? { telefono: telefono ? String(telefono).trim() : null } : {}),
         ...(notas !== undefined ? { notas } : {}),
         ...(estado ? { estado } : {}),
