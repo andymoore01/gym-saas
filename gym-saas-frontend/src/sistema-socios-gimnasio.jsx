@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap');`;
-const API_URL = import.meta.env.VITE_API_URL || 'https://gym-saas-backend-vwm9.onrender.com';
+const API_URL = 'https://gym-saas-backend-vwm9.onrender.com/api/socios';
 const PLAN_INFO = {
   "3dias": { label: "3 días", defaultFee: 12000 },
   libre: { label: "Libre", defaultFee: 18000 },
@@ -42,7 +42,7 @@ export default function GymMembershipSystem() {
 
   const fetchMembers = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/socios`);
+      const response = await fetch(API_URL);
       if (!response.ok) throw new Error("Error en la conexión con la API");
       const data = await response.json();
       
@@ -139,7 +139,7 @@ export default function GymMembershipSystem() {
     try {
       let res;
       if (editingMember) {
-        res = await fetch(`${API_URL}/api/socios/${editingMember.id}`, {
+        res = await fetch(`${API_URL}/${editingMember.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(newMemberPayload),
@@ -168,7 +168,7 @@ export default function GymMembershipSystem() {
     if (!window.confirm("¿Seguro que deseas eliminar este socio de la base de datos?")) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/socios/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Error al eliminar");
       
       await fetchMembers();

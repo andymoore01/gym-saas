@@ -9,24 +9,11 @@ import suscripcionRoutes from './routes/suscripcion.routes.js';
 
 const app = express();
 
-// Permitir peticiones tanto locales como desde Vercel
-const allowedOrigins = [
-  'http://localhost:5173',
-  'https://gym-saas-omega.vercel.app'
-];
-
+// Configuración de CORS limpia y permisiva para producción
 app.use(cors({
-  origin: (origin, callback) => {
-    // Permitir peticiones sin origen (como Postman o curl) o si están en la lista permitida
-    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Bloqueado por CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 app.use(express.json());
@@ -38,4 +25,4 @@ app.use('/api/auth', authRoutes);
 app.use('/api/pagos', pagosRoutes);
 app.use('/api/suscripcion', suscripcionRoutes);
 
-export default app;
+export default app;saveError
