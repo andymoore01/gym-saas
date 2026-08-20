@@ -519,3 +519,5 @@ const handleDeleteMember = async (id) => {
     </div>
   );
 }
+
+export default GymMembershipSystem;
