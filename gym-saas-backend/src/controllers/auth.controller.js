@@ -13,6 +13,7 @@ export const registrarGimnasio = async (req, res) => {
 
     const emailLimpio = email.trim().toLowerCase();
 
+    // Verificar si ya existe un usuario con ese email
     const usuarioExistente = await prisma.usuario.findFirst({
       where: { email: emailLimpio }
     });
@@ -21,6 +22,7 @@ export const registrarGimnasio = async (req, res) => {
       return res.status(400).json({ error: "El email ya se encuentra registrado" });
     }
 
+    // 1. Crear el gimnasio
     const nuevoGym = await prisma.gimnasio.create({
       data: {
         nombre: nombre.trim(),
@@ -30,6 +32,7 @@ export const registrarGimnasio = async (req, res) => {
       }
     });
 
+    // 2. Encriptar contraseña y crear el usuario administrador vinculado
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await prisma.usuario.create({
@@ -44,8 +47,8 @@ export const registrarGimnasio = async (req, res) => {
 
     return res.status(201).json({ mensaje: "Gimnasio registrado con éxito", gimnasio: nuevoGym });
   } catch (error) {
-    console.error("Error al registrar gimnasio:", error);
-    return res.status(500).json({ error: "Error al registrar el gimnasio", detalle: error.message });
+    console.error("Error detallado al registrar gimnasio:", error);
+    return res.status(500).json({ error: "Error al crear el gimnasio", detalle: error.message });
   }
 };
 

@@ -18,5 +18,17 @@ export const requireAuth = (req, res, next) => {
   }
 };
 
-// Exportación por defecto por si algún otro archivo lo importa como default
+// Middleware exclusivo para verificar que sea SuperAdmin
+export const requireSuperAdmin = (req, res, next) => {
+  // Primero ejecutamos la validación del token llamando a requireAuth o leyéndolo directamente
+  requireAuth(req, res, () => {
+    if (req.auth && req.auth.rol === 'SUPERADMIN') {
+      next();
+    } else {
+      return res.status(403).json({ error: 'Acceso denegado. Se requiere rol de SuperAdmin.' });
+    }
+  });
+};
+
+// Exportación por defecto
 export default requireAuth;
