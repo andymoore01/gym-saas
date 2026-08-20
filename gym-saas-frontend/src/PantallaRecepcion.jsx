@@ -9,14 +9,20 @@ export default function PantallaRecepcion() {
   const [filtroEstado, setFiltroEstado] = useState('Todos');
   const [cargando, setCargando] = useState(true);
   const [mensajeError, setMensajeError] = useState('');
+  
+  // Modales
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
 
+  // Estados de formularios
   const [nuevoSocio, setNuevoSocio] = useState({
     nombre: '',
     dni: '',
     telefono: '',
     planId: ''
   });
+
+  const [socioEditar, setSocioEditar] = useState(null);
 
   // Cargar lista de socios y planes desde el backend
   const cargarDatos = async () => {
@@ -73,13 +79,11 @@ export default function PantallaRecepcion() {
     cargarDatos();
   }, []);
 
-  // Manejo de Cierre de Sesión
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.location.reload();
   };
 
-  // Enviar mensaje por WhatsApp
   const enviarWhatsApp = (socio) => {
     if (!socio.telefono) {
       alert('Este socio no tiene un teléfono registrado.');
@@ -99,7 +103,7 @@ export default function PantallaRecepcion() {
     window.open(url, '_blank');
   };
 
-  // Crear un nuevo socio desde el frontend
+  // Crear un nuevo socio
   const handleCrearSocio = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
@@ -134,11 +138,80 @@ export default function PantallaRecepcion() {
     }
   };
 
+  // Abrir modal de edicion
+  const abrirEditar = (socio) => {
+    setSocioEditar({
+      id: socio.id,
+      nombre: socio.nombre || '',
+      dni: socio.dni || socio.documento || '',
+      telefono: socio.telefono || '',
+      planId: socio.planId || socio.plan?.id || ''
+    });
+    setModalEditarAbierto(true);
+  };
+
+  // Guardar edición de socio
+  const handleGuardarEdicion = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+
+    try {
+      const response = await fetch(`${API_URL}/socios/${socioEditar.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(socioEditar)
+      });
+
+      if (response.ok) {
+        setModalEditarAbierto(false);
+        setSocioEditar(null);
+        cargarDatos();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        alert(`Error al actualizar socio: ${err.error || 'No se pudo guardar los cambios'}`);
+      }
+    } catch (error) {
+      console.error('Error al editar:', error);
+      alert('Error de conexión al actualizar.');
+    }
+  };
+
+  // Eliminar socio
+  const handleEliminarSocio = async (socio) => {
+    const confirmar = window.confirm(`¿Estás seguro de que querés eliminar a ${socio.nombre}?`);
+    if (!confirmar) return;
+
+    const token = localStorage.getItem('token');
+
+    try {
+      const response = await fetch(`${API_URL}/socios/${socio.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        cargarDatos();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        alert(`Error al eliminar: ${err.error || 'No se pudo eliminar el socio'}`);
+      }
+    } catch (error) {
+      console.error('Error al borrar:', error);
+      alert('Error de red al intentar eliminar.');
+    }
+  };
+
   const sociosFiltrados = socios.filter((socio) => {
+    const dniSocio = socio.dni || socio.documento || '';
     const coincideTexto =
       socio.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
       socio.telefono?.includes(busqueda) ||
-      socio.dni?.includes(busqueda);
+      dniSocio.includes(busqueda);
 
     if (filtroEstado === 'Todos') return coincideTexto;
     if (filtroEstado === 'Al día' || filtroEstado === 'ACTIVO') return coincideTexto && socio.estado === 'ACTIVO';
@@ -277,7 +350,7 @@ export default function PantallaRecepcion() {
                 {sociosFiltrados.map((socio) => (
                   <tr key={socio.id} className="hover:bg-zinc-800/30 transition-colors">
                     <td className="py-3 px-2 font-medium text-white">{socio.nombre}</td>
-                    <td className="py-3 px-2 text-zinc-400">{socio.dni || '-'}</td>
+                    <td className="py-3 px-2 text-zinc-400">{socio.dni || socio.documento || '-'}</td>
                     <td className="py-3 px-2 text-zinc-400">{socio.telefono || '-'}</td>
                     <td className="py-3 px-2">
                       <span
@@ -291,14 +364,27 @@ export default function PantallaRecepcion() {
                       </span>
                     </td>
                     <td className="py-3 px-2 text-zinc-400">{socio.plan?.nombre || 'Sin plan'}</td>
-                    <td className="py-3 px-2 text-center">
+                    <td className="py-3 px-2 text-center flex items-center justify-center gap-1.5">
                       <button
                         onClick={() => enviarWhatsApp(socio)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-all"
+                        className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-all"
                         title="Avisar por WhatsApp"
                       >
-                        <span>💬</span>
-                        Avisar
+                        💬 Avisar
+                      </button>
+                      <button
+                        onClick={() => abrirEditar(socio)}
+                        className="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 text-xs font-semibold transition-all"
+                        title="Editar Socio"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleEliminarSocio(socio)}
+                        className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-semibold transition-all"
+                        title="Eliminar Socio"
+                      >
+                        🗑️
                       </button>
                     </td>
                   </tr>
@@ -309,7 +395,7 @@ export default function PantallaRecepcion() {
         )}
       </div>
 
-      {/* MODAL NUEVO SOCIO */}
+      {/* MODAL CREAR SOCIO */}
       {modalAbierto && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-[#181B1E] border border-zinc-800 rounded-2xl p-6 max-w-md w-full space-y-4">
@@ -382,6 +468,80 @@ export default function PantallaRecepcion() {
                   className="flex-1 bg-[#C6FF3D] text-black font-bold py-2 rounded-xl text-sm hover:bg-[#b0f024] transition-all"
                 >
                   Guardar Socio
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITAR SOCIO */}
+      {modalEditarAbierto && socioEditar && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#181B1E] border border-zinc-800 rounded-2xl p-6 max-w-md w-full space-y-4">
+            <h3 className="text-lg font-bold text-white uppercase">Editar Socio</h3>
+            
+            <form onSubmit={handleGuardarEdicion} className="space-y-3">
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Nombre Completo</label>
+                <input
+                  type="text"
+                  required
+                  value={socioEditar.nombre}
+                  onChange={(e) => setSocioEditar({ ...socioEditar, nombre: e.target.value })}
+                  className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">DNI</label>
+                <input
+                  type="text"
+                  value={socioEditar.dni}
+                  onChange={(e) => setSocioEditar({ ...socioEditar, dni: e.target.value })}
+                  className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={socioEditar.telefono}
+                  onChange={(e) => setSocioEditar({ ...socioEditar, telefono: e.target.value })}
+                  className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Plan</label>
+                <select
+                  value={socioEditar.planId}
+                  onChange={(e) => setSocioEditar({ ...socioEditar, planId: e.target.value })}
+                  className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-[#C6FF3D] font-medium focus:outline-none focus:border-[#C6FF3D]"
+                >
+                  <option value="" className="text-white">Seleccionar plan...</option>
+                  {listaSeguraPlanes.map((plan) => (
+                    <option key={plan.id} value={plan.id} className="text-white">
+                      {plan.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalEditarAbierto(false)}
+                  className="flex-1 bg-zinc-800 text-zinc-300 font-bold py-2 rounded-xl text-sm hover:bg-zinc-700 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#C6FF3D] text-black font-bold py-2 rounded-xl text-sm hover:bg-[#b0f024] transition-all"
+                >
+                  Actualizar
                 </button>
               </div>
             </form>
