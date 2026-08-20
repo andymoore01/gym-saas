@@ -1,12 +1,19 @@
-
 import { Router } from 'express';
-import { getSocios, createSocio } from '../controllers/socios.controller.js';
+import { 
+  getSocios, 
+  getSocioById, 
+  crearSocio, 
+  actualizarSocio, 
+  eliminarSocio 
+} from '../controllers/socios.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+
 const router = Router();
 
-// Protegemos todas las rutas con verifyToken
-router.get('/', verifyToken, getSocios);
-router.post('/', verifyToken, createSocio);
-router.delete('/:id', deleteSocio);
+router.get('/', requireAuth, getSocios);
+router.get('/:id', requireAuth, getSocioById);
+router.post('/', requireAuth, crearSocio); // 👈 Usar crearSocio
+router.put('/:id', requireAuth, actualizarSocio);
+router.delete('/:id', requireAuth, eliminarSocio);
 
 export default router;
