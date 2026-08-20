@@ -7,39 +7,40 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 // --- TENANT ---------------------------------------------------
 
 model Gimnasio {
-  id            String    @id @default(cuid())
-  nombre        String
-  slug          String    @unique // ej: "gym-central" -> usado en subdominio o URL
-  email         String    @unique
-  createdAt     DateTime  @default(now())
-  activo    Boolean  @default(true) // 👈 Control de suspensión
+  id          String   @id @default(cuid())
+  nombre      String
+  slug        String   @unique // ej: "gym-central" -> usado en subdominio o URL
+  email       String   @unique
+  createdAt   DateTime @default(now())
+  activo      Boolean  @default(true) // 👈 Control de suspensión
   // Estado de la suscripción QUE EL GIMNASIO TE PAGA A VOS (el SaaS)
-  suscripcion   Suscripcion?
+  suscripcion Suscripcion?
 
-  usuarios      Usuario[]
-  socios        Socio[]
-  planes        Plan[]
+  usuarios    Usuario[]
+  socios      Socio[]
+  planes      Plan[]
+  pagos       Pago[]
 }
 
 // Suscripción del gimnasio a TU producto (lo que le cobrás vos, dueño del SaaS)
 model Suscripcion {
-  id                  String   @id @default(cuid())
-  gimnasio            Gimnasio @relation(fields: [gimnasioId], references: [id])
-  gimnasioId          String   @unique
+  id                       String            @id @default(cuid())
+  gimnasio                 Gimnasio          @relation(fields: [gimnasioId], references: [id])
+  gimnasioId               String            @unique
 
-  estado              EstadoSuscripcion @default(EN_PRUEBA)
-  mercadopagoPreapprovalId String? // id de la suscripción recurrente en Mercado Pago
-  fechaInicio         DateTime @default(now())
-  fechaProximoCobro   DateTime?
-  planSaas            String   @default("basico") // básico / pro / etc. (tus propios planes de venta)
+  estado                   EstadoSuscripcion @default(EN_PRUEBA)
+  mercadopagoPreapprovalId String?           // id de la suscripción recurrente en Mercado Pago
+  fechaInicio              DateTime          @default(now())
+  fechaProximoCobro        DateTime?
+  planSaas                 String            @default("basico") // básico / pro / etc. (tus propios planes de venta)
 }
 
 enum EstadoSuscripcion {
@@ -52,15 +53,15 @@ enum EstadoSuscripcion {
 // --- USUARIOS DEL GIMNASIO (staff que usa el sistema) ----------
 
 model Usuario {
-  id          String   @id @default(cuid())
-  gimnasio    Gimnasio @relation(fields: [gimnasioId], references: [id])
-  gimnasioId  String
+  id           String     @id @default(cuid())
+  gimnasio     Gimnasio   @relation(fields: [gimnasioId], references: [id])
+  gimnasioId   String
 
-  nombre      String
-  email       String
+  nombre       String
+  email        String
   passwordHash String
-  rol         RolUsuario @default(STAFF)
-  createdAt   DateTime @default(now())
+  rol          RolUsuario @default(STAFF)
+  createdAt    DateTime   @default(now())
 
   @@unique([gimnasioId, email]) // el mismo email puede existir en 2 gimnasios distintos
 }
@@ -73,56 +74,51 @@ enum RolUsuario {
 // --- PLANES DE CUOTA DEL GIMNASIO (3 días / libre / etc.) ------
 
 model Plan {
-  id          String   @id @default(cuid())
-  gimnasio    Gimnasio @relation(fields: [gimnasioId], references: [id])
-  gimnasioId  String
+  id         String   @id @default(cuid())
+  gimnasio   Gimnasio @relation(fields: [gimnasioId], references: [id])
+  gimnasioId String
 
-  nombre      String  // "3 días", "Libre", "Libre + clases", etc. (configurable por gimnasio)
-  precio      Int     // en centavos o unidad mínima de moneda, para evitar floats
-  socios      Socio[]
+  nombre     String   // "3 días", "Libre", "Libre + clases", etc. (configurable por gimnasio)
+  precio     Int      // en centavos o unidad mínima de moneda, para evitar floats
+  socios     Socio[]
 }
 
 // --- SOCIOS ------------------------------------------------------
 
 model Socio {
-  id          String   @id @default(cuid())
-  gimnasio    Gimnasio @relation(fields: [gimnasioId], references: [id])
-  gimnasioId  String
-  dni         String?  // <-- Agregá esta línea (el ? significa opcional)
+  id          String    @id @default(uuid())
   nombre      String
+  dni         String?
   telefono    String?
   notas       String?
-  estado      EstadoSocio @default(ACTIVO)
-  joinedDate  DateTime @default(now())
-  bajaDate    DateTime?
+  estado      String    @default("ACTIVO")
+  vencimiento DateTime?
 
-  plan        Plan     @relation(fields: [planId], references: [id])
-  planId      String
+  gimnasio    Gimnasio  @relation(fields: [gimnasioId], references: [id])
+  gimnasioId  String
 
+  planId      String?
+  plan        Plan?     @relation(fields: [planId], references: [id])
   pagos       Pago[]
-
-  @@index([gimnasioId])
+  joinedDate  DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt // 👈 Agregale @default(now()) acá
 }
-
 enum EstadoSocio {
   ACTIVO
   BAJA
 }
 
 model Pago {
-  id          String   @id @default(cuid())
-  socio       Socio    @relation(fields: [socioId], references: [id])
-  socioId     String
+  id         String   @id @default(uuid())
+  monto      Float
+  fechaPago  DateTime @default(now())
+  metodoPago String   @default("EFECTIVO") // EFECTIVO, TRANSFERENCIA, TARJETA, MERCADOPAGO
 
-  // Se repite gimnasioId acá (denormalizado a propósito) para poder
-  // filtrar/reportar pagos por tenant sin tener que hacer join con Socio.
-  gimnasioId  String
+  socioId    String
+  socio      Socio    @relation(fields: [socioId], references: [id], onDelete: Cascade)
 
-  fecha       DateTime @default(now())
-  monto       Int
-  metodo      MetodoPago @default(EFECTIVO)
-
-  @@index([gimnasioId, fecha])
+  gimnasio   Gimnasio @relation(fields: [gimnasioId], references: [id])
+  gimnasioId String
 }
 
 enum MetodoPago {
