@@ -57,8 +57,15 @@ router.post('/gimnasios', async (req, res) => {
     }
 
     const emailLimpio = email.trim().toLowerCase();
+    const nombreLimpio = nombre.trim();
 
-    // Validar si el email ya existe en la tabla Usuario
+    // Generar el slug automáticamente (ej: "Hulk Gym" -> "hulk-gym")
+    const slugGenerado = nombreLimpio
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    // Validar si el email ya existe en la tabla Usuario usando findFirst
     const usuarioExistente = await prisma.usuario.findFirst({
       where: { email: emailLimpio }
     });
@@ -67,10 +74,11 @@ router.post('/gimnasios', async (req, res) => {
       return res.status(400).json({ error: "El email ya se encuentra registrado" });
     }
 
-    // 1. Crear el Gimnasio
+    // 1. Crear el Gimnasio (incluyendo el slug obligatorio)
     const nuevoGym = await prisma.gimnasio.create({
       data: {
-        nombre: nombre.trim(),
+        nombre: nombreLimpio,
+        slug: slugGenerado,
         email: emailLimpio,
         telefono: telefono ? telefono.trim() : null,
         estado: 'ACTIVO'
@@ -82,9 +90,9 @@ router.post('/gimnasios', async (req, res) => {
 
     await prisma.usuario.create({
       data: {
-        nombre: `Admin ${nombre.trim()}`,
+        nombre: `Admin ${nombreLimpio}`,
         email: emailLimpio,
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         rol: 'ADMIN',
         gimnasioId: nuevoGym.id
       }
@@ -94,24 +102,6 @@ router.post('/gimnasios', async (req, res) => {
   } catch (error) {
     console.error("Error detallado al crear gimnasio:", error);
     return res.status(500).json({ error: "Error al crear el gimnasio", detalle: error.message });
-  }
-});
-
-// PUT /api/superadmin/gimnasios/:id/estado - Cambiar estado
-router.put('/gimnasios/:id/estado', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { estado } = req.body;
-
-    const gymActualizado = await prisma.gimnasio.update({
-      where: { id: String(id) },
-      data: { estado }
-    });
-
-    return res.json(gymActualizado);
-  } catch (error) {
-    console.error("Error al actualizar estado:", error);
-    return res.status(500).json({ error: "No se pudo actualizar el estado" });
   }
 });
 
