@@ -68,7 +68,28 @@ async function registrarPago(req, res) {
   }
 }
 
-// Comparativo mensual: altas, bajas e ingresos
+// Historial de pagos del gimnasio
+async function getPagos(req, res) {
+  try {
+    const gimnasioId = req.auth.gimnasioId;
+    const pagos = await prisma.pago.findMany({
+      where: { gimnasioId },
+      include: {
+        socio: {
+          select: { nombre: true, dni: true },
+        },
+      },
+      orderBy: { fechaPago: "desc" },
+    });
+
+    return res.json(pagos);
+  } catch (error) {
+    console.error("Error al obtener pagos:", error);
+    return res.status(500).json({ error: "Error al obtener historial de pagos" });
+  }
+}
+
+// Comparativo mensual: altas e ingresos
 async function comparativoMensual(req, res) {
   try {
     const gimnasioId = req.auth.gimnasioId;
@@ -94,4 +115,4 @@ async function comparativoMensual(req, res) {
   }
 }
 
-module.exports = { registrarPago, comparativoMensual };
+module.exports = { registrarPago, getPagos, comparativoMensual };
