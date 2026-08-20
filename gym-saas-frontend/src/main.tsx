@@ -6,7 +6,7 @@ import LandingPage from './LandingPage';
 import SuperAdmin from './SuperAdmin';
 import './style.css';
 
-// Función para extraer la información del JWT sin librerías externas
+// Función para leer el rol dentro del JWT
 function parseJwt(token: string) {
   try {
     const base64Url = token.split('.')[1];
@@ -28,6 +28,7 @@ function App() {
   const [token, setToken] = useState<string | null>(null);
   const [rolUsuario, setRolUsuario] = useState<string | null>(null);
   const [modoAdmin, setModoAdmin] = useState<boolean>(false);
+  const [vistaLogin, setVistaLogin] = useState<boolean>(false);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -38,20 +39,25 @@ function App() {
         setRolUsuario(decoded.rol);
       }
     }
+
+    // Detectar si la URL pide el Login (?login=true o #login)
+    const url = window.location.href.toLowerCase();
+    if (url.includes('login')) {
+      setVistaLogin(true);
+    }
   }, []);
 
   const esSuperAdmin = rolUsuario === 'SUPERADMIN';
 
-  // 1. VISTA SUPERADMIN (Solo si es SUPERADMIN y activó la vista)
+  // 1. PÁGINA SUPERADMIN
   if (modoAdmin && esSuperAdmin) {
     return <SuperAdmin onVolver={() => setModoAdmin(false)} />;
   }
 
-  // 2. VISTA RECEPCIÓN / GIMNASIO
+  // 2. SISTEMA RECEPCIÓN (GIMNASIO)
   if (token) {
     return (
       <div>
-        {/* La barra de SuperAdmin SOLO se renderiza para usuarios con rol SUPERADMIN */}
         {esSuperAdmin && (
           <div className="bg-[#090A0C] border-b border-zinc-800 px-4 py-1.5 flex justify-between items-center text-xs">
             <span className="text-purple-400 font-mono text-[11px] font-bold">
@@ -61,7 +67,7 @@ function App() {
               onClick={() => setModoAdmin(true)}
               className="bg-purple-900/80 hover:bg-purple-800 text-purple-200 border border-purple-500/40 px-3 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer"
             >
-              Abrir Panel de Control
+              Abrir Panel SuperAdmin
             </button>
           </div>
         )}
@@ -71,8 +77,25 @@ function App() {
     );
   }
 
-  // 3. LANDING PAGE
-  return <LandingPage onGoToLogin={() => (window.location.href = '/?login=true')} />;
+  // 3. PÁGINA DE LOGIN
+  if (vistaLogin) {
+    return (
+      <Login
+        onLoginSuccess={(newToken) => {
+          setToken(newToken);
+          setVistaLogin(false);
+          window.location.href = '/';
+        }}
+      />
+    );
+  }
+
+  // 4. LANDING PAGE
+  return (
+    <LandingPage
+      onGoToLogin={() => setVistaLogin(true)}
+    />
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

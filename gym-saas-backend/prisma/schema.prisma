@@ -69,6 +69,7 @@ model Usuario {
 enum RolUsuario {
   ADMIN
   STAFF
+  SUPERADMIN
 }
 
 // --- PLANES DE CUOTA DEL GIMNASIO (3 días / libre / etc.) ------
