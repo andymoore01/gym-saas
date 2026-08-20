@@ -8,20 +8,29 @@ import './style.css';
 
 function App() {
   const [token, setToken] = useState<string | null>(null);
-
-  // Leemos la ruta normal o los parametros ?vista=admin / ?admin=true
-  const path = window.location.pathname;
-  const searchParams = new URLSearchParams(window.location.search);
-  const esSuperAdmin = path === '/superadmin' || path === '/admin' || searchParams.get('vista') === 'admin';
+  const [route, setRoute] = useState<string>(window.location.hash || window.location.pathname);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
     if (savedToken) {
       setToken(savedToken);
     }
+
+    const handleHashChange = () => {
+      setRoute(window.location.hash || window.location.pathname);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // 1. VISTA SUPERADMIN (si entra por /superadmin o por /?vista=admin)
+  // Comprobar si la ruta o el hash solicitan el panel de SuperAdmin
+  const esSuperAdmin = 
+    route.includes('superadmin') || 
+    route.includes('admin') || 
+    window.location.search.includes('vista=admin');
+
+  // 1. VISTA SUPERADMIN (Acceso por /#/superadmin, /superadmin o ?vista=admin)
   if (esSuperAdmin) {
     return <SuperAdmin onVolver={() => (window.location.href = '/')} />;
   }
@@ -32,7 +41,7 @@ function App() {
   }
 
   // 3. LOGIN
-  if (path === '/login') {
+  if (route.includes('login')) {
     return (
       <Login
         onLoginSuccess={(newToken) => {
@@ -44,7 +53,7 @@ function App() {
   }
 
   // 4. LANDING PAGE
-  return <LandingPage onGoToLogin={() => (window.location.href = '/login')} />;
+  return <LandingPage onGoToLogin={() => (window.location.href = '/#/login')} />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
