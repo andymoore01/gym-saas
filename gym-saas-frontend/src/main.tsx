@@ -8,54 +8,41 @@ import './style.css';
 
 function App() {
   const [token, setToken] = useState<string | null>(null);
-
-  // Leer la URL completa y los parametros de búsqueda en cada render
-  const urlCompleta = window.location.href.toLowerCase();
-  const searchParams = new URLSearchParams(window.location.search);
-  
-  // Detección estricta de solicitud SuperAdmin
-  const esAdmin = 
-    urlCompleta.includes('superadmin') || 
-    urlCompleta.includes('admin') || 
-    searchParams.get('admin') === 'true' ||
-    searchParams.get('vista') === 'admin';
+  const [modoAdmin, setModoAdmin] = useState<boolean>(false);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
-    if (savedToken) {
-      setToken(savedToken);
+    if (savedToken) setToken(savedToken);
+
+    // Detección por URL
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('admin') === 'true' || window.location.hash.includes('admin')) {
+      setModoAdmin(true);
     }
   }, []);
 
-  // 1. SI PIDE ADMIN, MOSTRAR EXCLUSIVAMENTE SUPERADMIN (PRIORIDAD 1)
-  if (esAdmin) {
-    return (
-      <SuperAdmin 
-        onVolver={() => {
-          window.location.href = window.location.origin;
-        }} 
-      />
-    );
+  // 1. Si está activo el modo admin, muestra SuperAdmin
+  if (modoAdmin) {
+    return <SuperAdmin onVolver={() => setModoAdmin(false)} />;
   }
 
-  // 2. SI NO ES ADMIN Y HAY TOKEN -> APP DE RECEPCIÓN
+  // 2. Si está logueado, muestra la app normal
   if (token) {
-    return <PantallaRecepcion />;
-  }
-
-  // 3. PÁGINA DE LOGIN
-  if (urlCompleta.includes('login')) {
     return (
-      <Login
-        onLoginSuccess={(newToken) => {
-          setToken(newToken);
-          window.location.href = '/';
-        }}
-      />
+      <div>
+        {/* Acceso directo discreto en pantalla */}
+        <button
+          onClick={() => setModoAdmin(true)}
+          className="fixed bottom-2 left-2 bg-purple-900/90 text-purple-200 border border-purple-500/30 text-[10px] font-mono px-2 py-1 rounded-md z-50 hover:bg-purple-800 transition-all cursor-pointer"
+        >
+          👑 Ir a SuperAdmin
+        </button>
+        <PantallaRecepcion />
+      </div>
     );
   }
 
-  // 4. LANDING PAGE
+  // 3. Landing page
   return <LandingPage onGoToLogin={() => (window.location.href = '/?login=true')} />;
 }
 
