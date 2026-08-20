@@ -50,7 +50,6 @@ export default function PantallaRecepcion() {
 
       if (resPlanes.ok) {
         const dataPlanes = await resPlanes.json();
-        // Garantizamos extraer el array sin importar la estructura en que venga
         let lista = [];
         if (Array.isArray(dataPlanes)) {
           lista = dataPlanes;
@@ -73,65 +72,66 @@ export default function PantallaRecepcion() {
     cargarDatos();
   }, []);
 
-// Crear un nuevo socio
-  export const crearSocio = async (req, res) => {
-   try {
-     const gimnasioId = req.auth?.gimnasioId || req.auth?.id;
-     let { nombre, apellido, dni, email, telefono, planId } = req.body;
+  // Manejo de Cierre de Sesión
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    window.location.reload();
+  };
 
-     // Separar nombre y apellido si vienen juntos
-     if (nombre && !apellido) {
-       const partes = nombre.trim().split(' ');
-       if (partes.length > 1) {
-         nombre = partes[0];
-         apellido = partes.slice(1).join(' ');
-       } else {
-         apellido = '-';
-       }
-     }
+  // Enviar mensaje por WhatsApp
+  const enviarWhatsApp = (socio) => {
+    if (!socio.telefono) {
+      alert('Este socio no tiene un teléfono registrado.');
+      return;
+    }
 
-     if (!nombre) {
-       return res.status(400).json({ error: 'El nombre es obligatorio' });
-     }
+    let numLimpio = socio.telefono.replace(/\D/g, '');
 
-    // Armamos el objeto de datos dinámicamente para evitar fallos de claves foráneas
-     const dataPrisma = {
-       nombre,
-       apellido: apellido || '-',
-       dni: dni || null,
-       email: email || null,
-       telefono: telefono || null,
-       gimnasioId: gimnasioId,
-     };
+    if (!numLimpio.startsWith('549') && numLimpio.length === 10) {
+      numLimpio = `549${numLimpio}`;
+    }
 
-     // Conectar el plan solo si se seleccionó uno válido
-     if (planId && planId !== '') {
-       dataPrisma.plan = {
-         connect: { id: planId }
-       };
-     }
+    const nombrePlan = socio.plan?.nombre || 'su plan';
+    const mensaje = `Hola ${socio.nombre}! 👋 Te escribimos desde el gimnasio para recordarte que tu cuota del plan *${nombrePlan}* está próxima a vencer. ¡Te esperamos para renovar! 💪`;
 
-     const nuevoSocio = await prisma.socio.create({
-       data: dataPrisma,
-       include: {
-         plan: true
-       }
+    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
+    window.open(url, '_blank');
+  };
+
+  // Crear un nuevo socio desde el frontend
+  const handleCrearSocio = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+
+    if (!nuevoSocio.nombre.trim()) {
+      alert('El nombre es obligatorio');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/socios`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(nuevoSocio)
       });
 
-     return res.status(201).json({
-       mensaje: 'Socio creado exitosamente',
-       socio: nuevoSocio,
-     });
-   } catch (error) {
-     console.error('Error detallado al crear socio:', error);
-    
-    // Retornar la causa exacta de Prisma para no quedar a ciegas
-     return res.status(500).json({
-       error: 'Error interno al registrar el socio',
-       detalle: error.message || 'Error en la base de datos'
-     });
-   }
- };
+      const data = await response.json();
+
+      if (response.ok) {
+        setModalAbierto(false);
+        setNuevoSocio({ nombre: '', telefono: '', planId: '' });
+        cargarDatos();
+      } else {
+        alert(`Error al registrar socio: ${data.error || data.detalle || 'Intente nuevamente'}`);
+      }
+    } catch (error) {
+      console.error('Error al enviar el formulario:', error);
+      alert('Error de conexión al intentar guardar.');
+    }
+  };
 
   const sociosFiltrados = socios.filter((socio) => {
     const coincideTexto =
@@ -147,7 +147,7 @@ export default function PantallaRecepcion() {
   const totalActivos = socios.filter((s) => s.estado === 'ACTIVO').length;
   const totalVencidos = socios.filter((s) => s.estado === 'BAJA').length;
 
-  // Filtrado seguro de los 2 planes de mayor precio
+  // Filtrado seguro de planes
   const listaSeguraPlanes = Array.isArray(planes) ? planes : [];
   const planesMasCaros = [...listaSeguraPlanes]
     .sort((a, b) => {
@@ -268,6 +268,7 @@ export default function PantallaRecepcion() {
                   <th className="pb-3 px-2">Teléfono</th>
                   <th className="pb-3 px-2">Estado</th>
                   <th className="pb-3 px-2">Plan</th>
+                  <th className="pb-3 px-2 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
@@ -287,6 +288,16 @@ export default function PantallaRecepcion() {
                       </span>
                     </td>
                     <td className="py-3 px-2 text-zinc-400">{socio.plan?.nombre || 'Sin plan'}</td>
+                    <td className="py-3 px-2 text-center">
+                      <button
+                        onClick={() => enviarWhatsApp(socio)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-all"
+                        title="Avisar por WhatsApp"
+                      >
+                        <span>💬</span>
+                        Avisar
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -310,7 +321,7 @@ export default function PantallaRecepcion() {
                   value={nuevoSocio.nombre}
                   onChange={(e) => setNuevoSocio({ ...nuevoSocio, nombre: e.target.value })}
                   className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
-                  placeholder="Ej. Andy Moore"
+                  placeholder="Ej. Juan Pérez"
                 />
               </div>
 
@@ -330,27 +341,17 @@ export default function PantallaRecepcion() {
                 <select
                   value={nuevoSocio.planId}
                   onChange={(e) => setNuevoSocio({ ...nuevoSocio, planId: e.target.value })}
-                  className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
+                  className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-[#C6FF3D] font-medium focus:outline-none focus:border-[#C6FF3D]"
                 >
-                  <option value="">Seleccionar plan...</option>
-                  {planesMasCaros.length > 0
-                    ? planesMasCaros.map((plan) => {
-                        const precio = plan.precio || plan.monto || plan.valor;
-                        return (
-                          <option key={plan.id} value={plan.id}>
-                            {plan.nombre} {precio ? `- $${precio}` : ''}
-                          </option>
-                        );
-                      })
-                    : listaSeguraPlanes.map((plan) => {
-                        const precio = plan.precio || plan.monto || plan.valor;
-                        return (
-                          <option key={plan.id} value={plan.id}>
-                            {plan.nombre} {precio ? `- $${precio}` : ''}
-                          </option>
-                        );
-                      })
-                  }
+                  <option value="" className="text-white">Seleccionar plan...</option>
+                  {(planesMasCaros.length > 0 ? planesMasCaros : listaSeguraPlanes).map((plan) => {
+                    const precio = plan.precio || plan.monto || plan.valor;
+                    return (
+                      <option key={plan.id} value={plan.id} className="text-white">
+                        {plan.nombre} {precio ? `- $${precio}` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
