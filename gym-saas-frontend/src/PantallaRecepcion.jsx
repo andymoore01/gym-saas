@@ -14,11 +14,13 @@ export default function GymMembershipSystem() {
   // Modales
   const [modalAbierto, setModalAbierto] = useState(false);
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+  const [modalPlanesAbierto, setModalPlanesAbierto] = useState(false); // 👈 Nuevo Modal Planes
   const [socioCobrar, setSocioCobrar] = useState(null);
 
   // Estados de formularios
   const [nuevoSocio, setNuevoSocio] = useState({ nombre: '', dni: '', telefono: '', planId: '' });
   const [socioEditar, setSocioEditar] = useState(null);
+  const [nuevoPlan, setNuevoPlan] = useState({ nombre: '', precio: '' }); // 👈 Estado Crear Plan
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -79,7 +81,6 @@ export default function GymMembershipSystem() {
     }
 
     let numLimpio = socio.telefono.replace(/\D/g, '');
-
     if (!numLimpio.startsWith('549') && numLimpio.length === 10) {
       numLimpio = `549${numLimpio}`;
     }
@@ -87,8 +88,7 @@ export default function GymMembershipSystem() {
     const nombrePlan = socio.plan?.nombre || 'su plan';
     const mensaje = `Hola ${socio.nombre}! 👋 Te escribimos desde el gimnasio para recordarte que tu cuota del plan *${nombrePlan}* está próxima a vencer. ¡Te esperamos para renovar! 💪`;
 
-    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
-    window.open(url, '_blank');
+    window.open(`https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
   };
 
   const handleCrearSocio = async (e) => {
@@ -120,8 +120,60 @@ export default function GymMembershipSystem() {
         alert(`Error al registrar socio: ${data.error || data.detalle || 'Intente nuevamente'}`);
       }
     } catch (error) {
-      console.error('Error al enviar el formulario:', error);
       alert('Error de conexión al intentar guardar.');
+    }
+  };
+
+  // 👈 Crear nuevo plan personalizado
+  const handleCrearPlan = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+
+    if (!nuevoPlan.nombre.trim() || !nuevoPlan.precio) {
+      alert('Completá el nombre y el precio del plan');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/planes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(nuevoPlan)
+      });
+
+      if (response.ok) {
+        setNuevoPlan({ nombre: '', precio: '' });
+        cargarDatos(); // Recargar lista de planes
+      } else {
+        const err = await response.json().catch(() => ({}));
+        alert(`Error al crear plan: ${err.error || 'Intente nuevamente'}`);
+      }
+    } catch (error) {
+      alert('Error de conexión al crear plan.');
+    }
+  };
+
+  // 👈 Eliminar plan existente
+  const handleEliminarPlan = async (planId) => {
+    if (!window.confirm('¿Seguro que querés eliminar este plan?')) return;
+    const token = localStorage.getItem('token');
+
+    try {
+      const response = await fetch(`${API_URL}/planes/${planId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        cargarDatos();
+      } else {
+        alert('No se pudo eliminar el plan.');
+      }
+    } catch (error) {
+      alert('Error de red al eliminar el plan.');
     }
   };
 
@@ -140,11 +192,6 @@ export default function GymMembershipSystem() {
     e.preventDefault();
     const token = localStorage.getItem('token');
 
-    if (!socioEditar || !socioEditar.id) {
-      alert('Error: No se encontró el ID del socio a editar');
-      return;
-    }
-
     try {
       const response = await fetch(`${API_URL}/socios/${socioEditar.id}`, {
         method: 'PUT',
@@ -152,64 +199,38 @@ export default function GymMembershipSystem() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          nombre: socioEditar.nombre,
-          dni: socioEditar.dni,
-          telefono: socioEditar.telefono,
-          planId: socioEditar.planId
-        })
+        body: JSON.stringify(socioEditar)
       });
 
       if (response.ok) {
-        setSocios((prevSocios) =>
-          prevSocios.map((s) =>
-            s.id === socioEditar.id
-              ? {
-                  ...s,
-                  nombre: socioEditar.nombre,
-                  dni: socioEditar.dni,
-                  telefono: socioEditar.telefono,
-                  planId: socioEditar.planId
-                }
-              : s
-          )
-        );
         setModalEditarAbierto(false);
         setSocioEditar(null);
         await cargarDatos();
       } else {
-        const err = await response.json().catch(() => ({}));
-        alert(`Error al actualizar socio (${response.status}): ${err.error || err.detalle || 'No se pudo guardar'}`);
+        alert('Error al actualizar socio');
       }
     } catch (error) {
-      console.error('Error al editar:', error);
-      alert(`Error de conexión al actualizar: ${error.message}`);
+      alert(`Error de conexión: ${error.message}`);
     }
   };
 
   const handleEliminarSocio = async (socio) => {
-    const confirmar = window.confirm(`¿Estás seguro de que querés eliminar a ${socio.nombre}?`);
-    if (!confirmar) return;
-
+    if (!window.confirm(`¿Estás seguro de que querés eliminar a ${socio.nombre}?`)) return;
     const token = localStorage.getItem('token');
 
     try {
       const response = await fetch(`${API_URL}/socios/${socio.id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
         cargarDatos();
       } else {
-        const err = await response.json().catch(() => ({}));
-        alert(`Error al eliminar: ${err.error || 'No se pudo eliminar el socio'}`);
+        alert('No se pudo eliminar el socio.');
       }
     } catch (error) {
-      console.error('Error al borrar:', error);
-      alert('Error de red al intentar eliminar.');
+      alert('Error de red al eliminar.');
     }
   };
 
@@ -236,15 +257,6 @@ export default function GymMembershipSystem() {
   const totalActivos = socios.filter((s) => s.estado === 'ACTIVO').length;
   const totalVencidos = socios.filter((s) => s.estado === 'BAJA').length;
 
-  const listaSeguraPlanes = Array.isArray(planes) ? planes : [];
-  const planesMasCaros = [...listaSeguraPlanes]
-    .sort((a, b) => {
-      const precioA = Number(a.precio || a.monto || a.valor || 0);
-      const precioB = Number(b.precio || b.monto || b.valor || 0);
-      return precioB - precioA;
-    })
-    .slice(0, 2);
-
   return (
     <div className="min-h-screen bg-[#0E1012] text-white p-4 md:p-8 font-sans selection:bg-[#C6FF3D] selection:text-black">
       
@@ -263,12 +275,22 @@ export default function GymMembershipSystem() {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* BOTÓN NUEVO SOCIO */}
           <button
             onClick={() => setModalAbierto(true)}
-            className="flex-1 md:flex-initial bg-[#C6FF3D] hover:bg-[#b0f024] text-black font-black px-5 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(198,255,61,0.2)] active:scale-95 text-sm"
+            className="flex-1 md:flex-initial bg-[#C6FF3D] hover:bg-[#b0f024] text-black font-black px-4 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(198,255,61,0.2)] active:scale-95 text-sm"
           >
             + Nuevo socio
           </button>
+
+          {/* BOTÓN GESTIONAR PLANES */}
+          <button
+            onClick={() => setModalPlanesAbierto(true)}
+            className="bg-[#181B1E] hover:bg-zinc-800 text-zinc-200 font-semibold px-3.5 py-2.5 rounded-xl border border-zinc-800 transition-all active:scale-95 text-sm flex items-center gap-1.5"
+          >
+            ⚙️ Planes
+          </button>
+
           <button
             onClick={handleLogout}
             className="bg-[#181B1E] hover:bg-zinc-800 text-zinc-300 font-medium px-4 py-2.5 rounded-xl border border-zinc-800 transition-all active:scale-95 text-sm"
@@ -282,16 +304,11 @@ export default function GymMembershipSystem() {
       {mensajeError && (
         <div className="max-w-7xl mx-auto mb-6 bg-red-950/30 border border-red-800/50 text-red-300 text-xs p-3.5 rounded-2xl flex items-center justify-between gap-4 backdrop-blur-md">
           <span>⚠️ <strong>Detalle del error:</strong> {mensajeError}</span>
-          <button 
-            onClick={cargarDatos}
-            className="underline font-bold hover:text-white shrink-0"
-          >
-            Reintentar
-          </button>
+          <button onClick={cargarDatos} className="underline font-bold hover:text-white shrink-0">Reintentar</button>
         </div>
       )}
 
-      {/* METRICAS CON NEÓN Y SOMBRAS */}
+      {/* METRICAS */}
       <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-6">
         <div className="bg-[#16191C] border border-zinc-800/80 p-4 rounded-2xl hover:border-zinc-700 transition-all shadow-lg">
           <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Socios Activos</p>
@@ -340,7 +357,7 @@ export default function GymMembershipSystem() {
         </div>
       </div>
 
-      {/* TABLA DE SOCIOS CON AVATARES Y PULSO EN ESTADO */}
+      {/* TABLA DE SOCIOS */}
       <div className="max-w-7xl mx-auto bg-[#16191C] border border-zinc-800/80 rounded-2xl p-4 min-h-[300px] shadow-2xl">
         {cargando ? (
           <div className="flex items-center justify-center py-20 text-zinc-500 text-sm">
@@ -387,9 +404,11 @@ export default function GymMembershipSystem() {
                         {socio.estado}
                       </span>
                     </td>
-                    <td className="py-3.5 px-3 text-zinc-300 font-medium">{socio.plan?.nombre || 'Sin plan'}</td>
+                    <td className="py-3.5 px-3 text-zinc-300 font-medium">
+                      {socio.plan?.nombre || 'Sin plan'}
+                      {socio.plan?.precio && <span className="text-zinc-500 text-xs block font-mono">${socio.plan.precio}</span>}
+                    </td>
                     <td className="py-3.5 px-3 text-center flex items-center justify-center gap-1.5">
-                      {/* BOTÓN COBRAR CON SOMBRA Y RESPLANDOR */}
                       <button
                         onClick={() => setSocioCobrar(socio)}
                         className="px-3 py-1.5 rounded-xl bg-[#C6FF3D] hover:bg-[#b0f024] text-black text-xs font-black transition-all shadow-[0_0_12px_rgba(198,255,61,0.25)] flex items-center gap-1 active:scale-95"
@@ -397,7 +416,6 @@ export default function GymMembershipSystem() {
                       >
                         💳 Cobrar
                       </button>
-
                       <button
                         onClick={() => enviarWhatsApp(socio)}
                         className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-all active:scale-95"
@@ -427,6 +445,78 @@ export default function GymMembershipSystem() {
           </div>
         )}
       </div>
+
+      {/* MODAL GESTIONAR PLANES */}
+      {modalPlanesAbierto && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#16191C] border border-zinc-800 rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-bold text-white uppercase flex items-center gap-2">
+                ⚙️ Planes Configurados
+              </h3>
+              <button
+                onClick={() => setModalPlanesAbierto(false)}
+                className="text-zinc-400 hover:text-white font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Crear nuevo plan */}
+            <form onSubmit={handleCrearPlan} className="bg-[#0E1012] p-4 rounded-xl border border-zinc-800/80 space-y-3">
+              <p className="text-xs font-bold text-zinc-300 uppercase">Crear Nuevo Plan</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Nombre (ej. Pase Libre)"
+                  value={nuevoPlan.nombre}
+                  onChange={(e) => setNuevoPlan({ ...nuevoPlan, nombre: e.target.value })}
+                  className="bg-[#16191C] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#C6FF3D]"
+                  required
+                />
+                <input
+                  type="number"
+                  placeholder="Precio ($)"
+                  value={nuevoPlan.precio}
+                  onChange={(e) => setNuevoPlan({ ...nuevoPlan, precio: e.target.value })}
+                  className="bg-[#16191C] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#C6FF3D]"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-[#C6FF3D] hover:bg-[#b0f024] text-black font-bold py-2 rounded-xl text-xs transition-all"
+              >
+                + Agregar Plan
+              </button>
+            </form>
+
+            {/* Lista de planes actuales */}
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <p className="text-xs font-bold text-zinc-400 uppercase">Mis Planes Actuales</p>
+              {planes.length === 0 ? (
+                <p className="text-xs text-zinc-500 italic">No tenés planes creados todavía.</p>
+              ) : (
+                planes.map((p) => (
+                  <div key={p.id} className="flex justify-between items-center bg-[#0E1012] px-3.5 py-2.5 rounded-xl border border-zinc-800/60 text-xs">
+                    <div>
+                      <span className="font-bold text-white block">{p.nombre}</span>
+                      <span className="text-[#C6FF3D] font-mono">${p.precio}</span>
+                    </div>
+                    <button
+                      onClick={() => handleEliminarPlan(p.id)}
+                      className="text-zinc-500 hover:text-red-400 p-1"
+                      title="Eliminar Plan"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL COBRAR */}
       {socioCobrar && (
@@ -486,14 +576,11 @@ export default function GymMembershipSystem() {
                   className="w-full bg-[#0E1012] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-[#C6FF3D] font-medium focus:outline-none focus:border-[#C6FF3D]"
                 >
                   <option value="" className="text-white">Seleccionar plan...</option>
-                  {(planesMasCaros.length > 0 ? planesMasCaros : listaSeguraPlanes).map((plan) => {
-                    const precio = plan.precio || plan.monto || plan.valor;
-                    return (
-                      <option key={plan.id} value={plan.id} className="text-white">
-                        {plan.nombre} {precio ? `- $${precio}` : ''}
-                      </option>
-                    );
-                  })}
+                  {planes.map((plan) => (
+                    <option key={plan.id} value={plan.id} className="text-white">
+                      {plan.nombre} {plan.precio ? `- $${plan.precio}` : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -563,9 +650,9 @@ export default function GymMembershipSystem() {
                   className="w-full bg-[#0E1012] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-[#C6FF3D] font-medium focus:outline-none focus:border-[#C6FF3D]"
                 >
                   <option value="" className="text-white">Seleccionar plan...</option>
-                  {listaSeguraPlanes.map((plan) => (
+                  {planes.map((plan) => (
                     <option key={plan.id} value={plan.id} className="text-white">
-                      {plan.nombre}
+                      {plan.nombre} {plan.precio ? `- $${plan.precio}` : ''}
                     </option>
                   ))}
                 </select>
