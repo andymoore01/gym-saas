@@ -13,6 +13,7 @@ export default function PantallaRecepcion() {
 
   const [nuevoSocio, setNuevoSocio] = useState({
     nombre: '',
+    dni: '',
     telefono: '',
     planId: ''
   });
@@ -122,7 +123,7 @@ export default function PantallaRecepcion() {
 
       if (response.ok) {
         setModalAbierto(false);
-        setNuevoSocio({ nombre: '', telefono: '', planId: '' });
+        setNuevoSocio({ nombre: '', dni: '', telefono: '', planId: '' });
         cargarDatos();
       } else {
         alert(`Error al registrar socio: ${data.error || data.detalle || 'Intente nuevamente'}`);
@@ -136,7 +137,8 @@ export default function PantallaRecepcion() {
   const sociosFiltrados = socios.filter((socio) => {
     const coincideTexto =
       socio.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      socio.telefono?.includes(busqueda);
+      socio.telefono?.includes(busqueda) ||
+      socio.dni?.includes(busqueda);
 
     if (filtroEstado === 'Todos') return coincideTexto;
     if (filtroEstado === 'Al día' || filtroEstado === 'ACTIVO') return coincideTexto && socio.estado === 'ACTIVO';
@@ -147,7 +149,6 @@ export default function PantallaRecepcion() {
   const totalActivos = socios.filter((s) => s.estado === 'ACTIVO').length;
   const totalVencidos = socios.filter((s) => s.estado === 'BAJA').length;
 
-  // Filtrado seguro de planes
   const listaSeguraPlanes = Array.isArray(planes) ? planes : [];
   const planesMasCaros = [...listaSeguraPlanes]
     .sort((a, b) => {
@@ -225,7 +226,7 @@ export default function PantallaRecepcion() {
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Buscar por nombre o teléfono..."
+            placeholder="Buscar por nombre, DNI o teléfono..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="w-full bg-[#181B1E] border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
@@ -265,6 +266,7 @@ export default function PantallaRecepcion() {
               <thead className="text-xs text-zinc-400 uppercase border-b border-zinc-800">
                 <tr>
                   <th className="pb-3 px-2">Nombre</th>
+                  <th className="pb-3 px-2">DNI</th>
                   <th className="pb-3 px-2">Teléfono</th>
                   <th className="pb-3 px-2">Estado</th>
                   <th className="pb-3 px-2">Plan</th>
@@ -275,6 +277,7 @@ export default function PantallaRecepcion() {
                 {sociosFiltrados.map((socio) => (
                   <tr key={socio.id} className="hover:bg-zinc-800/30 transition-colors">
                     <td className="py-3 px-2 font-medium text-white">{socio.nombre}</td>
+                    <td className="py-3 px-2 text-zinc-400">{socio.dni || '-'}</td>
                     <td className="py-3 px-2 text-zinc-400">{socio.telefono || '-'}</td>
                     <td className="py-3 px-2">
                       <span
@@ -322,6 +325,17 @@ export default function PantallaRecepcion() {
                   onChange={(e) => setNuevoSocio({ ...nuevoSocio, nombre: e.target.value })}
                   className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
                   placeholder="Ej. Juan Pérez"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">DNI</label>
+                <input
+                  type="text"
+                  value={nuevoSocio.dni}
+                  onChange={(e) => setNuevoSocio({ ...nuevoSocio, dni: e.target.value })}
+                  className="w-full bg-[#111315] border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C6FF3D]"
+                  placeholder="Ej. 40123456"
                 />
               </div>
 
