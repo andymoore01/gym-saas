@@ -3,7 +3,6 @@ import prisma from '../lib/prisma.js';
 
 const router = express.Router();
 
-// GET /api/planes - Obtener todos los planes del gimnasio
 router.get('/', async (req, res) => {
   try {
     const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1;
@@ -21,19 +20,17 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/planes - Crear un nuevo plan
 router.post('/', async (req, res) => {
   try {
     const { nombre, precio } = req.body;
 
-    if (!nombre || precio === undefined) {
-      return res.status(400).json({ error: 'El nombre y el precio del plan son obligatorios' });
+    if (!nombre || precio === undefined || isNaN(Number(precio))) {
+      return res.status(400).json({ error: 'El nombre y un precio numérico válido son obligatorios' });
     }
 
     const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId || 1;
     const parsedGimnasioId = !isNaN(Number(rawGimnasioId)) ? Number(rawGimnasioId) : String(rawGimnasioId);
 
-    // Intentamos crear solo con los campos core obligatorios para evitar fallos por campos extra
     const nuevoPlan = await prisma.plan.create({
       data: {
         nombre: String(nombre).trim(),
@@ -44,7 +41,7 @@ router.post('/', async (req, res) => {
 
     return res.status(201).json(nuevoPlan);
   } catch (error) {
-    console.error('Error interno al crear el plan:', error);
+    console.error('Error interno al crear plan:', error);
     return res.status(500).json({ 
       error: 'Error interno al crear el plan', 
       detalle: error.message 
@@ -52,7 +49,6 @@ router.post('/', async (req, res) => {
   }
 });
 
-// DELETE /api/planes/:id - Eliminar un plan
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;

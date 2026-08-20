@@ -126,35 +126,40 @@ export default function GymMembershipSystem() {
 
   // 👈 Crear nuevo plan personalizado
   const handleCrearPlan = async (e) => {
-    e.preventDefault();
-    const token = localStorage.getItem('token');
+  e.preventDefault();
+  const token = localStorage.getItem('token');
 
-    if (!nuevoPlan.nombre.trim() || !nuevoPlan.precio) {
-      alert('Completá el nombre y el precio del plan');
-      return;
+  if (!nuevoPlan.nombre.trim() || !nuevoPlan.precio) {
+    alert('Completá el nombre y el precio del plan');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/planes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        nombre: nuevoPlan.nombre.trim(),
+        precio: Number(nuevoPlan.precio)
+      })
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (response.ok) {
+      setNuevoPlan({ nombre: '', precio: '' });
+      await cargarDatos(); // Recargar lista
+    } else {
+      alert(`Error al crear plan (${response.status}): ${data.error || data.detalle || 'Error en el servidor'}`);
     }
-
-    try {
-      const response = await fetch(`${API_URL}/planes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(nuevoPlan)
-      });
-
-      if (response.ok) {
-        setNuevoPlan({ nombre: '', precio: '' });
-        cargarDatos(); // Recargar lista de planes
-      } else {
-        const err = await response.json().catch(() => ({}));
-        alert(`Error al crear plan: ${err.error || 'Intente nuevamente'}`);
-      }
-    } catch (error) {
-      alert('Error de conexión al crear plan.');
-    }
-  };
+  } catch (error) {
+    console.error('Error de red al crear plan:', error);
+    alert(`Error de conexión al crear plan: ${error.message}`);
+  }
+};
 
   // 👈 Eliminar plan existente
   const handleEliminarPlan = async (planId) => {
