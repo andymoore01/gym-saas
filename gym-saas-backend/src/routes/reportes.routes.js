@@ -6,27 +6,27 @@ const router = express.Router();
 router.get('/ingresos', async (req, res) => {
   try {
     const rawGimnasioId = req.auth?.gimnasioId || req.auth?.id || req.usuario?.gimnasioId;
-    
-    // Obtenemos un gimnasio válido
-    let gimnasioId = rawGimnasioId;
-    if (!gimnasioId) {
-      const primerGym = await prisma.gimnasio.findFirst();
-      if (primerGym) gimnasioId = primerGym.id;
-    }
 
-    if (!gimnasioId) {
-      return res.status(400).json({ error: 'No se encontró un gimnasio asociado' });
-    }
-
-    // Calcular inicio y fin del mes actual
+    // Rango de fechas del mes actual
     const ahora = new Date();
     const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
     const finMes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
 
-    // Obtener todos los pagos del mes
+    // Condición de búsqueda flexible para gimnasioId
+    let filtroGimnasio = {};
+    if (rawGimnasioId) {
+      filtroGimnasio = {
+        OR: [
+          { gimnasioId: String(rawGimnasioId) },
+          { gimnasioId: !isNaN(Number(rawGimnasioId)) ? Number(rawGimnasioId) : -1 }
+        ]
+      };
+    }
+
+    // Buscamos todos los pagos del mes que coincidan o todos los pagos si no hay filtro estricto
     const pagosMes = await prisma.pago.findMany({
       where: {
-        gimnasioId: String(gimnasioId),
+        ...filtroGimnasio,
         fechaPago: {
           gte: inicioMes,
           lte: finMes
@@ -40,14 +40,14 @@ router.get('/ingresos', async (req, res) => {
 
     // Totales calculados
     const totalEfectivo = pagosMes
-      .filter(p => p.metodoPago === 'EFECTIVO')
-      .reduce((acc, p) => acc + Number(p.monto), 0);
+      .filter(p => (p.metodoPago || '').toUpperCase() === 'EFECTIVO')
+      .reduce((acc, p) => acc + Number(p.monto || 0), 0);
 
     const totalTransferencia = pagosMes
-      .filter(p => p.metodoPago === 'TRANSFERENCIA')
-      .reduce((acc, p) => acc + Number(p.monto), 0);
+      .filter(p => (p.metodoPago || '').toUpperCase() === 'TRANSFERENCIA')
+      .reduce((acc, p) => acc + Number(p.monto || 0), 0);
 
-    const recaudacionTotal = totalEfectivo + totalTransferencia;
+    const recaudacionTotal = pagosMes.reduce((acc, p) => acc + Number(p.monto || 0), 0);
 
     return res.json({
       mesActual: ahora.toLocaleString('es-AR', { month: 'long', year: 'numeric' }),
@@ -60,7 +60,7 @@ router.get('/ingresos', async (req, res) => {
 
   } catch (error) {
     console.error('Error al obtener reporte de ingresos:', error);
-    return res.status(500).json({ error: 'Error al generar el reporte de ingresos' });
+    return res.status(500).json({ error: 'Error al generar el reporte de ingresos', detalle: error.message });
   }
 });
 
