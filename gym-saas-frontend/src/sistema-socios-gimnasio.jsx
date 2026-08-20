@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap');`;
+// La URL base del backend en Render
 const API_URL = 'https://gym-saas-backend-vwm9.onrender.com';
 
 const PLAN_INFO = {
@@ -62,7 +63,7 @@ export default function GymMembershipSystem() {
         return;
       }
 
-      const response = await fetch(`${API_URL}/api/socios`, {
+      const response = await fetch(`${API_URL}/socios`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -75,6 +76,7 @@ export default function GymMembershipSystem() {
       const formattedData = data.map(m => ({
         id: m.id,
         name: m.nombre || m.name || "",
+        dni: m.dni || "-",
         phone: m.telefono || m.phone || "",
         plan: m.plan || "libre",
         customFee: m.monto || m.customFee || m.plan?.precio || 18000,
@@ -144,7 +146,7 @@ export default function GymMembershipSystem() {
     const token = localStorage.getItem('token');
 
     try {
-      const res = await fetch(`${API_URL}/api/pagos`, {
+      const res = await fetch(`${API_URL}/pagos`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -176,7 +178,8 @@ export default function GymMembershipSystem() {
     return members.filter((m) => {
       const matchesSearch =
         (m.name || "").toLowerCase().includes(search.toLowerCase()) ||
-        (m.phone || "").includes(search);
+        (m.phone || "").includes(search) ||
+        (m.dni || "").includes(search);
       const status = getStatus(m.dueDate);
 
       if (filter === "active") return matchesSearch && status === "active";
@@ -231,7 +234,7 @@ export default function GymMembershipSystem() {
     try {
       let res;
       if (editingMember) {
-        res = await fetch(`${API_URL}/api/socios/${editingMember.id}`, {
+        res = await fetch(`${API_URL}/socios/${editingMember.id}`, {
           method: "PUT",
           headers: { 
             "Content-Type": "application/json",
@@ -240,7 +243,7 @@ export default function GymMembershipSystem() {
           body: JSON.stringify(newMemberPayload),
         });
       } else {
-        res = await fetch(`${API_URL}/api/socios`, {
+        res = await fetch(`${API_URL}/socios`, {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
@@ -268,7 +271,7 @@ export default function GymMembershipSystem() {
     const token = localStorage.getItem('token');
 
     try {
-      const res = await fetch(`${API_URL}/api/socios/${id}`, { 
+      const res = await fetch(`${API_URL}/socios/${id}`, { 
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -366,7 +369,7 @@ export default function GymMembershipSystem() {
           <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar por nombre o teléfono..."
+            placeholder="Buscar por nombre, DNI o teléfono..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-[#181B1E] border border-zinc-800 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#C6FF3D]"
@@ -396,32 +399,43 @@ export default function GymMembershipSystem() {
       </div>
 
       {/* Lista de Socios */}
-      <div className="max-w-6xl mx-auto space-y-3">
-        {filteredMembers.length === 0 ? (
-          <div className="bg-[#181B1E] border border-zinc-800 rounded-2xl p-12 text-center text-zinc-500 text-sm">
-            No se encontraron socios en la base de datos.
-          </div>
-        ) : (
-          filteredMembers.map((m) => {
-            const planName = typeof m.plan === 'object' ? m.plan?.nombre : m.plan;
-            const displayPlan = PLAN_INFO[planName]?.label || planName || 'Sin Plan';
+      <div className="max-w-6xl mx-auto bg-[#181B1E] border border-zinc-800 rounded-2xl overflow-hidden p-4">
+        {/* Encabezado de la Tabla */}
+        <div className="grid grid-cols-12 text-xs font-bold text-zinc-400 uppercase tracking-wider pb-3 border-b border-zinc-800/80 px-2">
+          <div className="col-span-3">NOMBRE</div>
+          <div className="col-span-2">DNI</div>
+          <div className="col-span-2">TELÉFONO</div>
+          <div className="col-span-2">ESTADO</div>
+          <div className="col-span-1">PLAN</div>
+          <div className="col-span-2 text-right">ACCIONES</div>
+        </div>
 
-            const status = getStatus(m.dueDate);
-            const nombreSocio = m.name || 'Socio sin nombre';
-            const ultimoPago = m.lastPaymentDate || 'No registrado';
-            const fechaVenc = m.dueDate || '-';
-            const cuota = m.customFee || 0;
-            const telefono = m.phone;
-            const notas = m.notes;
+        {/* Filas */}
+        <div className="divide-y divide-zinc-800/50">
+          {filteredMembers.length === 0 ? (
+            <div className="p-8 text-center text-zinc-500 text-sm">
+              No se encontraron socios registrados.
+            </div>
+          ) : (
+            filteredMembers.map((m) => {
+              const planName = typeof m.plan === 'object' ? m.plan?.nombre : m.plan;
+              const displayPlan = PLAN_INFO[planName]?.label || planName || 'Plan Libre';
 
-            return (
-              <div
-                key={m.id}
-                className="bg-[#181B1E] border border-zinc-800/80 hover:border-zinc-700 rounded-2xl p-4 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-base text-white">{nombreSocio}</span>
+              const status = getStatus(m.dueDate);
+              const nombreSocio = m.name || 'Socio sin nombre';
+              const dniSocio = m.dni || '-';
+              const telefono = m.phone || '-';
+
+              return (
+                <div
+                  key={m.id}
+                  className="grid grid-cols-12 items-center py-3.5 px-2 text-sm hover:bg-zinc-800/30 transition-all"
+                >
+                  <div className="col-span-3 font-semibold text-white">{nombreSocio}</div>
+                  <div className="col-span-2 text-zinc-400">{dniSocio}</div>
+                  <div className="col-span-2 text-zinc-400">{telefono}</div>
+                  
+                  <div className="col-span-2">
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                         status === "active"
@@ -431,55 +445,45 @@ export default function GymMembershipSystem() {
                           : "bg-red-950 text-red-400 border border-red-800/50"
                       }`}
                     >
-                      {status === "active" ? "Al día" : status === "due_soon" ? "Por vencer" : "Vencido"}
-                    </span>
-
-                    <span className="text-xs text-zinc-400 bg-zinc-800/60 px-2 py-0.5 rounded-md">
-                      {displayPlan}
+                      {status === "active" ? "ACTIVO" : status === "due_soon" ? "POR VENCER" : "VENCIDO"}
                     </span>
                   </div>
 
-                  <div className="text-xs text-zinc-400 flex flex-wrap gap-x-4 gap-y-1 pt-1">
-                    <span>Último pago: {ultimoPago}</span>
-                    <span className={status === "expired" ? "text-red-400 font-semibold" : ""}>
-                      Vence: {fechaVenc}
-                    </span>
-                    <span>${Number(cuota).toLocaleString()}</span>
-                    {telefono && <span className="text-zinc-500">📞 {telefono}</span>}
+                  <div className="col-span-1 text-zinc-400 text-xs">{displayPlan}</div>
+
+                  <div className="col-span-2 flex items-center justify-end gap-1.5">
+                    {/* BOTÓN COBRAR */}
+                    <button
+                      onClick={() => handleOpenPaymentModal(m)}
+                      className="bg-[#C6FF3D] hover:bg-[#b0f024] text-black font-bold px-2.5 py-1 rounded-lg text-xs flex items-center gap-1 transition-all"
+                      title="Registrar pago"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" /> Cobrar
+                    </button>
+
+                    {/* BOTÓN WHATSAPP */}
+                    <button
+                      onClick={() => handleSendWhatsApp(m)}
+                      className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold px-2 py-1 rounded-lg text-xs flex items-center gap-1 transition-all"
+                      title="Enviar recordatorio"
+                    >
+                      💬 Avisar
+                    </button>
+
+                    {/* BOTÓN ELIMINAR */}
+                    <button
+                      onClick={() => handleDeleteMember(m.id)}
+                      className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-all"
+                      title="Eliminar socio"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  {notas && <p className="text-xs text-zinc-500 italic pt-0.5">{notas}</p>}
                 </div>
-
-                <div className="flex items-center gap-2 self-end sm:self-center">
-                  {/* BOTÓN REGISTRAR PAGO */}
-                  <button
-                    onClick={() => handleOpenPaymentModal(m)}
-                    className="bg-[#C6FF3D] hover:bg-[#b0f024] text-black font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
-                  >
-                    <CreditCard className="w-3.5 h-3.5" /> Cobrar
-                  </button>
-
-                  {/* BOTÓN WHATSAPP */}
-                  <button
-                    onClick={() => handleSendWhatsApp(m)}
-                    className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
-                    title="Enviar recordatorio"
-                  >
-                    💬 Avisar
-                  </button>
-
-                  {/* BOTÓN ELIMINAR */}
-                  <button
-                    onClick={() => handleDeleteMember(m.id)}
-                    className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-xl transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Modal Nuevo Socio */}
