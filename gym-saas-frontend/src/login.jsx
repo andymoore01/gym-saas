@@ -19,14 +19,14 @@ export default function Login({ onLoginSuccess }) {
       const data = await response.json();
 
       if (response.ok && data.token) {
-        // 1. Guardar en localStorage
+        // Guardar credenciales en el navegador
         localStorage.setItem('token', data.token);
         if (data.usuario) {
           localStorage.setItem('usuario', JSON.stringify(data.usuario));
           localStorage.setItem('gimnasioId', data.usuario.gimnasioId);
         }
 
-        // 2. Notificar al padre pasándole el token en mano
+        // Notificar al padre o forzar recarga si no hay callback
         if (onLoginSuccess) {
           onLoginSuccess(data.token);
         } else {

@@ -14,12 +14,8 @@ function App() {
     }
   }, []);
 
-  const handleLoginSuccess = (newToken: string) => {
-    setToken(newToken);
-  };
-
   if (!token) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    return <Login onLoginSuccess={(newToken) => setToken(newToken)} />;
   }
 
   return <PantallaRecepcion />;
