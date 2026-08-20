@@ -14,13 +14,18 @@ export default function GymMembershipSystem() {
   // Modales
   const [modalAbierto, setModalAbierto] = useState(false);
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
-  const [modalPlanesAbierto, setModalPlanesAbierto] = useState(false); // 👈 Nuevo Modal Planes
+  const [modalPlanesAbierto, setModalPlanesAbierto] = useState(false);
+  const [modalReporteAbierto, setModalReporteAbierto] = useState(false); // 👈 Nuevo Modal Reporte / Caja Diaria
   const [socioCobrar, setSocioCobrar] = useState(null);
+
+  // Estados de reportes / caja
+  const [pagosDelDia, setPagosDelDia] = useState([]);
+  const [cargandoReporte, setCargandoReporte] = useState(false);
 
   // Estados de formularios
   const [nuevoSocio, setNuevoSocio] = useState({ nombre: '', dni: '', telefono: '', planId: '' });
   const [socioEditar, setSocioEditar] = useState(null);
-  const [nuevoPlan, setNuevoPlan] = useState({ nombre: '', precio: '' }); // 👈 Estado Crear Plan
+  const [nuevoPlan, setNuevoPlan] = useState({ nombre: '', precio: '' });
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -68,6 +73,39 @@ export default function GymMembershipSystem() {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // 👈 Cargar reporte de pagos del día
+  const abrirReporteCaja = async () => {
+    setModalReporteAbierto(true);
+    setCargandoReporte(true);
+    const token = localStorage.getItem('token');
+
+    try {
+      const res = await fetch(`${API_URL}/pagos`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const listaPagos = Array.isArray(data) ? data : (data.pagos || data.data || []);
+        
+        // Filtrar solo los pagos realizados el día de hoy (hora local o formato fecha YYYY-MM-DD)
+        const hoyStr = new Date().toISOString().split('T')[0];
+        const delDia = listaPagos.filter(p => {
+          const fechaPago = (p.createdAt || p.fecha || '').split('T')[0];
+          return fechaPago === hoyStr;
+        });
+
+        setPagosDelDia(delDia);
+      } else {
+        setPagosDelDia([]);
+      }
+    } catch (err) {
+      console.error('Error al cargar pagos:', err);
+      setPagosDelDia([]);
+    } finally {
+      setCargandoReporte(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -124,44 +162,42 @@ export default function GymMembershipSystem() {
     }
   };
 
-  // 👈 Crear nuevo plan personalizado
   const handleCrearPlan = async (e) => {
-  e.preventDefault();
-  const token = localStorage.getItem('token');
+    e.preventDefault();
+    const token = localStorage.getItem('token');
 
-  if (!nuevoPlan.nombre.trim() || !nuevoPlan.precio) {
-    alert('Completá el nombre y el precio del plan');
-    return;
-  }
-
-  try {
-    const response = await fetch(`${API_URL}/planes`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        nombre: nuevoPlan.nombre.trim(),
-        precio: Number(nuevoPlan.precio)
-      })
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (response.ok) {
-      setNuevoPlan({ nombre: '', precio: '' });
-      await cargarDatos(); // Recargar lista
-    } else {
-      alert(`Error al crear plan (${response.status}): ${data.error || data.detalle || 'Error en el servidor'}`);
+    if (!nuevoPlan.nombre.trim() || !nuevoPlan.precio) {
+      alert('Completá el nombre y el precio del plan');
+      return;
     }
-  } catch (error) {
-    console.error('Error de red al crear plan:', error);
-    alert(`Error de conexión al crear plan: ${error.message}`);
-  }
-};
 
-  // 👈 Eliminar plan existente
+    try {
+      const response = await fetch(`${API_URL}/planes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          nombre: nuevoPlan.nombre.trim(),
+          precio: Number(nuevoPlan.precio)
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok) {
+        setNuevoPlan({ nombre: '', precio: '' });
+        await cargarDatos();
+      } else {
+        alert(`Error al crear plan (${response.status}): ${data.error || data.detalle || 'Error en el servidor'}`);
+      }
+    } catch (error) {
+      console.error('Error de red al crear plan:', error);
+      alert(`Error de conexión al crear plan: ${error.message}`);
+    }
+  };
+
   const handleEliminarPlan = async (planId) => {
     if (!window.confirm('¿Seguro que querés eliminar este plan?')) return;
     const token = localStorage.getItem('token');
@@ -262,6 +298,17 @@ export default function GymMembershipSystem() {
   const totalActivos = socios.filter((s) => s.estado === 'ACTIVO').length;
   const totalVencidos = socios.filter((s) => s.estado === 'BAJA').length;
 
+  // Totales calculados para el reporte diario
+  const totalEfectivo = pagosDelDia
+    .filter(p => (p.metodoPago || p.metodo || '').toLowerCase().includes('efectivo'))
+    .reduce((acc, p) => acc + Number(p.monto || 0), 0);
+
+  const totalTransferencia = pagosDelDia
+    .filter(p => (p.metodoPago || p.metodo || '').toLowerCase().includes('transferencia'))
+    .reduce((acc, p) => acc + Number(p.monto || 0), 0);
+
+  const recaudacionTotalDia = totalEfectivo + totalTransferencia;
+
   return (
     <div className="min-h-screen bg-[#0E1012] text-white p-4 md:p-8 font-sans selection:bg-[#C6FF3D] selection:text-black">
       
@@ -279,13 +326,21 @@ export default function GymMembershipSystem() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-3 w-full md:w-auto flex-wrap justify-end">
           {/* BOTÓN NUEVO SOCIO */}
           <button
             onClick={() => setModalAbierto(true)}
-            className="flex-1 md:flex-initial bg-[#C6FF3D] hover:bg-[#b0f024] text-black font-black px-4 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(198,255,61,0.2)] active:scale-95 text-sm"
+            className="bg-[#C6FF3D] hover:bg-[#b0f024] text-black font-black px-4 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(198,255,61,0.2)] active:scale-95 text-sm"
           >
             + Nuevo socio
+          </button>
+
+          {/* BOTÓN REPORTE / CAJA */}
+          <button
+            onClick={abrirReporteCaja}
+            className="bg-[#181B1E] hover:bg-zinc-800 text-[#C6FF3D] border border-[#C6FF3D]/30 font-bold px-3.5 py-2.5 rounded-xl transition-all active:scale-95 text-sm flex items-center gap-1.5"
+          >
+            📊 Caja / Reporte
           </button>
 
           {/* BOTÓN GESTIONAR PLANES */}
@@ -451,6 +506,67 @@ export default function GymMembershipSystem() {
         )}
       </div>
 
+      {/* MODAL REPORTE / CAJA DIARIA */}
+      {modalReporteAbierto && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#16191C] border border-zinc-800 rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-bold text-white uppercase flex items-center gap-2">
+                📊 Reporte y Caja del Día
+              </h3>
+              <button
+                onClick={() => setModalReporteAbierto(false)}
+                className="text-zinc-400 hover:text-white font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {cargandoReporte ? (
+              <div className="text-center py-10 text-zinc-400 text-sm">Calculando caja diaria...</div>
+            ) : (
+              <div className="space-y-4">
+                {/* Tarjetas resumen */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-[#0E1012] p-3 rounded-xl border border-zinc-800 text-center">
+                    <p className="text-[10px] text-zinc-400 font-bold uppercase">Efectivo</p>
+                    <p className="text-lg font-black text-[#C6FF3D] mt-1">${totalEfectivo}</p>
+                  </div>
+                  <div className="bg-[#0E1012] p-3 rounded-xl border border-zinc-800 text-center">
+                    <p className="text-[10px] text-zinc-400 font-bold uppercase">Transferencia</p>
+                    <p className="text-lg font-black text-blue-400 mt-1">${totalTransferencia}</p>
+                  </div>
+                  <div className="bg-[#0E1012] p-3 rounded-xl border border-zinc-800 text-center">
+                    <p className="text-[10px] text-zinc-400 font-bold uppercase">Total Recaudado</p>
+                    <p className="text-lg font-black text-white mt-1">${recaudacionTotalDia}</p>
+                  </div>
+                </div>
+
+                {/* Lista de cobros de hoy */}
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-zinc-400 uppercase">Cobros registrados hoy ({pagosDelDia.length})</p>
+                  <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
+                    {pagosDelDia.length === 0 ? (
+                      <p className="text-xs text-zinc-500 italic text-center py-6">No hay cobros registrados en el día de hoy.</p>
+                    ) : (
+                      pagosDelDia.map((p, idx) => (
+                        <div key={p.id || idx} className="flex justify-between items-center bg-[#0E1012] px-3.5 py-2.5 rounded-xl border border-zinc-800/60 text-xs">
+                          <div>
+                            <span className="font-bold text-white block">{p.socio?.nombre || p.nombreSocio || 'Socio'}</span>
+                            <span className="text-zinc-400 text-[11px] uppercase">Método: {p.metodoPago || p.metodo || 'Efectivo'}</span>
+                          </div>
+                          <span className="text-[#C6FF3D] font-mono font-bold text-sm">+${p.monto}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* MODAL GESTIONAR PLANES */}
       {modalPlanesAbierto && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -467,7 +583,6 @@ export default function GymMembershipSystem() {
               </button>
             </div>
 
-            {/* Crear nuevo plan */}
             <form onSubmit={handleCrearPlan} className="bg-[#0E1012] p-4 rounded-xl border border-zinc-800/80 space-y-3">
               <p className="text-xs font-bold text-zinc-300 uppercase">Crear Nuevo Plan</p>
               <div className="grid grid-cols-2 gap-2">
@@ -496,7 +611,6 @@ export default function GymMembershipSystem() {
               </button>
             </form>
 
-            {/* Lista de planes actuales */}
             <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
               <p className="text-xs font-bold text-zinc-400 uppercase">Mis Planes Actuales</p>
               {planes.length === 0 ? (
